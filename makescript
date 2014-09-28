@@ -1,0 +1,39 @@
+/* Target constants */
+var bootmgrjs = "js";
+var libraries = [];
+
+ls("libs").forEach(function(f){
+	if(isDir("libs/"+f)){
+		libraries.push(f);
+	}
+});
+
+var libArchieve=libraries.map(function(lib){
+	return "bin/libs/"+lib+".a";
+});
+
+var libPath=libraries.map(function(lib){
+	return "libs/"+lib;
+});
+
+/* Targets */
+setDefault("everything");
+
+phony("everything", libArchieve.concat(bootmgrjs));
+
+phony("clean", function() {
+	make("main", "clean");
+	libPath.forEach(function(lib){
+		make(lib, ["-S", "../makescript", "clean"]);
+	});
+});
+
+phony("all", ["clean", "everything"]);
+
+target(bootmgrjs, libArchieve.concat("main", $make("main")));
+
+libPath.forEach(function(lib, id){
+	target(libArchieve[id], [lib, $make(lib, ["-S", "../makescript"])]);
+});
+
+mkdirIfNotExist("bin");

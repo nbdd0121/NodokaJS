@@ -1,0 +1,56 @@
+/* Target constants */
+var output = "../js";
+var depLibrary = [
+  "js",
+  "unicode",
+  "data-struct",
+].map(function(name) {
+  return "../bin/libs/" + name + ".a";
+});
+var objOutput = [];
+
+recursiveList(".").forEach(function(file) {
+  var ext = file.extension();
+  if (ext == ".c") {
+    objOutput.push("../bin/bootmgrjs/" + file.extension(".o"));
+  }
+});
+
+var cCompiler = "gcc";
+var cFlags = (
+  "-I ../include/ -I ./ " +
+  "-Os -c -g " +
+  "-fno-signed-char -funsigned-char -Wimplicit " +
+  "-Wall --std=gnu99"
+).split(" ");
+
+/* Helper functions */
+function ld(target, dep) {
+  exec("gcc", [
+    "-o", target,
+  ].concat(dep, "-lm"));
+}
+
+function cc(target, dep) {
+  exec(cCompiler, cFlags.concat(dep, "-o", target));
+}
+
+/* Targets */
+setDefault("everything");
+
+phony("everything", output);
+
+phony("clean", function() {
+  rm(objOutput.concat(output), ["r", "f"]);
+});
+
+phony("all", ["clean", "everything"]);
+
+target(output, objOutput.concat(depLibrary, ld));
+
+targetRegex(/^.*\.o$/, $depExist, function(target) {
+  return target.replace("../bin/bootmgrjs/", "").extension(".c");
+}, cc);
+
+mkdirIfNotExist("../bin");
+mkdirIfNotExist("../bin/bootmgrjs");

@@ -1,0 +1,23 @@
+xLicense Documentation
+xLicense 许可文档
+
+xLicense is designed to protect the copyright of the author of the program while letting the software to be useful and helpful to other people or other softwares.
+xLicense的目的是在保护作者权益的同时使软件对他人和其他软件有用。
+
+Softwares published under xLicense should be published in source codes, or binary files with source codes. Softwares published under xLicense can be used by any people without notifying copyright owners for noncommercial purpose . If a software uses softwares under xLicense, the software should either publish its source code, or list used softwares and their copyright owners to the help page of the published software.
+在xLicense下发布的软件可以以源代码或者二进制文件+源代码的形式发布。 xLicense下发布的可以在不通知原作者的情况下被用作非商业用途。使用了以xLicense发布的软件需要以开源的形式发布，或者在帮助页面中提及其使用的软件和软件作者。
+
+If a product using xLicense softwares will be published for commercial purpose, the producer should contact copyright owners and ask for permission.
+如果一个使用了以xLicense发布的产品要以商业用途发布，制造商需要联系原作者以征求许可。
+
+Copyright owners have the right to withdraw from xLicense, but the previous versions of the software under xLicense will still under xLicense and other developers still have right to use the old version of the software.
+以xLicense发布的软件的作者有权退出xLicense，但是之前发布的版本仍然在xLicense之下，并能够被其他开发者所使用。
+
+If a software uses softwares published under xLicense, the software author will be regarded as acknowledge any details in xLicense. The copyright owner of the software under xLicense has the right to accuse any actions which disobeyed this license.
+如果一个软件使用了以xLicense发布的软件，软件作者被视为认可xLicense的任何细节。以xLicense发布的软件的作者有权利控告任何不遵守这个许可证的行为。
+
+ANY EXPRESS OR IMPLIED WARRANTIES FOR USING SOFTWARES PUBLISHED UNDER XLICENSE ''AS ARE'', INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL COPYRIGHT OWNERS OR ANY OTHER CONTRIBUTORS OF THE SOFTWARE BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+以xLicense发布的软件“按现状”为根据提供，不提供任何明确或暗示的保证，包括但不限于本软件针对特定用途的可售性及适用性的暗示保证。在任何情况下，以xLicense发布的软件的版权所有者及贡献者均不对因使用本软件而以任何方式产生的任何直接、间接、偶然、特殊、典型或因此而生的损失（包括但不限于采购替换产品或服务；使用价值、数据或利润的损失；或业务中断）而根据任何责任理论，包括合同、严格责任或侵权行为（包括疏忽或其他）承担任何责任，即使在已经提醒可能发生此类损失的情况下。
+
+xLicense is only valid under English or Chinese version.
+只有英语和中文版本的xLicense是有效的。
