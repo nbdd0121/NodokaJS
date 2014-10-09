@@ -10,33 +10,41 @@
 #include "js/bytecode.h"
 
 int main() {
-    /* Read js from disk */
-    FILE *f = fopen("./test.js", "r+");
-    fseek(f, 0, SEEK_END);
-    long size = ftell(f);
-    char *buffer = malloc(size + 1);
-    rewind(f);
-    size_t numread = fread(buffer, sizeof(char), size, f);
-    assert(numread == size);
-    buffer[size] = 0;
+    /*long size;
+    char *buffer = nodoka_readFile("./test.js", &size);*/
 
-    nodoka_code_emitter *seg = nodoka_newCodeEmitter();
-    nodoka_emitBytecode(seg, NODOKA_BC_XCHG);
-    nodoka_emitBytecode(seg, NODOKA_BC_NOP);
-    nodoka_emitBytecode(seg, NODOKA_BC_XCHG);
+    nodoka_initConstant();
 
-    for (int i = 0; i < 10; i++) {
-        bool mod = false;
-        mod |= nodoka_peeholePass(seg);
-        mod |= nodoka_nopPass(seg);
-        if (!mod) {
-            break;
-        }
+    nodoka_code *code = nodoka_loadBytecode("./bytecode.nbc");
+    if (!code) {
+        nodoka_code_emitter *seg = nodoka_newCodeEmitter();
+        nodoka_emitBytecode(seg, NODOKA_BC_LOAD_NUM, 1.0);
+        nodoka_emitBytecode(seg, NODOKA_BC_LOAD_NUM, 2.0);
+        nodoka_emitBytecode(seg, NODOKA_BC_STR);
+        nodoka_emitBytecode(seg, NODOKA_BC_ADD);
+        nodoka_emitBytecode(seg, NODOKA_BC_RET);
+        /*for (int i = 0; i < 10; i++) {
+            bool mod = false;
+            mod |= nodoka_peeholePass(seg);
+            mod |= nodoka_nopPass(seg);
+            if (!mod) {
+                break;
+            }
+        }*/
+        code = nodoka_packCode(seg);
     }
 
-    nodoka_code *code = nodoka_packCode(seg);
+    //nodoka_storeBytecode("./bytecode.nbc", code);
 
     nodoka_printBytecode(code);
+
+    nodoka_context *context = nodoka_newContext(code);
+    nodoka_string *ret = nodoka_toString(nodoka_exec(context));
+
+    printf("return ");
+    unicode_putUtf16(ret->value);
+    printf("\n");
+
 
 
 

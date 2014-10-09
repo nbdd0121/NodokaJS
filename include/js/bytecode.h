@@ -26,7 +26,7 @@ enum nodoka_bytecode {
     NODOKA_BC_FALSE,
 
     /**
-     * [imm8] LOAD_STR
+     * [imm16] LOAD_STR
      * push the corresponding constant string to stack
      */
     NODOKA_BC_LOAD_STR,
@@ -62,6 +62,12 @@ enum nodoka_bytecode {
     NODOKA_BC_XCHG,
 
     /**
+     * [] RET
+     * return the top element
+     */
+    NODOKA_BC_RET,
+
+    /**
      * [] PRIM
      * convert the stack top to primitive
      */
@@ -94,8 +100,8 @@ enum nodoka_bytecode {
 
 struct nodoka_code {
     nodoka_data base;
-    nodoka_string *stringPool;
-    nodoka_code *codePool;
+    nodoka_string **stringPool;
+    nodoka_code **codePool;
     uint8_t *bytecode;
     size_t strPoolLength;
     size_t codePoolLength;
@@ -103,8 +109,8 @@ struct nodoka_code {
 };
 
 struct nodoka_code_emitter {
-    nodoka_string *stringPool;
-    nodoka_code *codePool;
+    nodoka_string **stringPool;
+    nodoka_code **codePool;
     uint8_t *bytecode;
     size_t strPoolLength;
     size_t codePoolLength;
@@ -112,4 +118,12 @@ struct nodoka_code_emitter {
     size_t strPoolCapacity;
     size_t codePoolCapacity;
     size_t bytecodeCapacity;
+};
+
+struct nodoka_context {
+    nodoka_code *code;
+    nodoka_data **stack;
+    nodoka_data **stackTop;
+    nodoka_data **stackLimit;
+    size_t insPtr;
 };
