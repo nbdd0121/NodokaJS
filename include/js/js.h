@@ -48,10 +48,9 @@ void *nodoka_exec(nodoka_context *context);
 
 bool nodoka_nopPass(nodoka_code_emitter *codeseg);
 bool nodoka_peeholePass(nodoka_code_emitter *codeseg);
+bool nodoka_convPass(nodoka_code_emitter *emitter);
 
 void nodoka_printBytecode(nodoka_code *);
-
-nodoka_code *nodoka_loadBytecode(char *path);
 
 void nodoka_initConstant(void);
 nodoka_data *nodoka_new_data(enum nodoka_data_type type);
@@ -69,6 +68,10 @@ nodoka_string *nodoka_toString(nodoka_data *value);
 
 /* vm/string.c */
 nodoka_string *nodoka_concatString(nodoka_string *lstr, nodoka_string *rstr);
+
+/* bcloader.c */
+char *nodoka_readFile(char *path, size_t *sizePtr);
+nodoka_code *nodoka_loadBytecode(char *path);
 
 extern nodoka_data *nodoka_null;
 extern nodoka_data *nodoka_undefined;

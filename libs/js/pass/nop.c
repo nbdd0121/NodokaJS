@@ -9,12 +9,11 @@ bool nodoka_nopPass(nodoka_code_emitter *codeseg) {
     int offset = 0;
     for (int i = 0; i < codeseg->bytecodeLength; i++) {
         enum nodoka_bytecode bc = codeseg->bytecode[i];
-        if (bc == NODOKA_BC_NOP) {
-            offset++;
-            continue;
-        }
-        if (offset) {
-            codeseg->bytecode[i - offset] = bc;
+        switch (bc) {
+            case NODOKA_BC_LOAD_STR: memmove(&codeseg->bytecode[i - offset], &codeseg->bytecode[i], 3); i += 2; break;
+            case NODOKA_BC_LOAD_NUM: memmove(&codeseg->bytecode[i - offset], &codeseg->bytecode[i], 9); i += 8; break;
+            case NODOKA_BC_NOP: offset++; break;
+            default: codeseg->bytecode[i - offset] = bc; break;
         }
     }
     codeseg->bytecodeLength -= offset;

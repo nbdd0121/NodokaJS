@@ -107,15 +107,10 @@ enum nodoka_bytecode {
      * @Precondition sp0 is number
      */
     NODOKA_BC_NEG,
-
     NODOKA_BC_NOT,
-
     NODOKA_BC_L_NOT,
-
     NODOKA_BC_MUL,
-
     NODOKA_BC_MOD,
-
     NODOKA_BC_DIV,
     NODOKA_BC_ADD,
     NODOKA_BC_SUB,
