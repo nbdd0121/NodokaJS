@@ -1,5 +1,6 @@
 #include "c/assert.h"
 #include "c/stdlib.h"
+#include "c/math.h"
 
 #include "util/double.h"
 
@@ -120,6 +121,59 @@ void *nodoka_stepExec(nodoka_context *context) {
             nodoka_push(context, (nodoka_data *)nodoka_toString(nodoka_pop(context)));
             break;
         }
+        case NODOKA_BC_GET: {
+            nodoka_data *sp0 = nodoka_pop(context);
+            if (sp0->type == NODOKA_REFERENCE) {
+                assert(0);
+            } else {
+                nodoka_push(context, sp0);
+            }
+            break;
+        }
+        case NODOKA_BC_NEG: {
+            nodoka_data *sp0 = nodoka_pop(context);
+            assertNumber(sp0);
+            nodoka_number *sp0num = (nodoka_number *)sp0;
+            nodoka_push(context, (nodoka_data *)nodoka_newNumber(-sp0num->value));
+            break;
+        }
+        case NODOKA_BC_NOT: {
+            nodoka_data *sp0 = nodoka_pop(context);
+            assertNumber(sp0);
+            nodoka_number *sp0num = (nodoka_number *)sp0;
+            nodoka_push(context, (nodoka_data *)nodoka_newNumber(~nodoka_toInt32(sp0num)));
+            break;
+        }
+        case NODOKA_BC_L_NOT: {
+            nodoka_data *sp0 = nodoka_pop(context);
+            assertBoolean(sp0);
+            nodoka_push(context, sp0 == nodoka_true ? nodoka_false : nodoka_true);
+            break;
+        }
+        case NODOKA_BC_MUL: {
+            nodoka_number *sp0 = (nodoka_number *)nodoka_pop(context);
+            nodoka_number *sp1 = (nodoka_number *)nodoka_pop(context);
+            assertNumber(sp1);
+            assertNumber(sp0);
+            nodoka_push(context, (nodoka_data *)nodoka_newNumber(sp0->value * sp1->value));
+            break;
+        }
+        case NODOKA_BC_MOD: {
+            nodoka_number *sp0 = (nodoka_number *)nodoka_pop(context);
+            nodoka_number *sp1 = (nodoka_number *)nodoka_pop(context);
+            assertNumber(sp1);
+            assertNumber(sp0);
+            nodoka_push(context, (nodoka_data *)nodoka_newNumber(fmod(sp0->value, sp1->value)));
+            break;
+        }
+        case NODOKA_BC_DIV: {
+            nodoka_number *sp0 = (nodoka_number *)nodoka_pop(context);
+            nodoka_number *sp1 = (nodoka_number *)nodoka_pop(context);
+            assertNumber(sp1);
+            assertNumber(sp0);
+            nodoka_push(context, (nodoka_data *)nodoka_newNumber(sp0->value / sp1->value));
+            break;
+        }
         case NODOKA_BC_ADD: {
             nodoka_data *sp0 = nodoka_pop(context);
             nodoka_data *sp1 = nodoka_pop(context);
@@ -136,6 +190,14 @@ void *nodoka_stepExec(nodoka_context *context) {
             }
             break;
         }
+        case NODOKA_BC_SUB: {
+            nodoka_number *sp0 = (nodoka_number *)nodoka_pop(context);
+            nodoka_number *sp1 = (nodoka_number *)nodoka_pop(context);
+            assertNumber(sp1);
+            assertNumber(sp0);
+            nodoka_push(context, (nodoka_data *)nodoka_newNumber(sp0->value - sp1->value));
+            break;
+        }
         default: assert(0);
     }
     return NULL;
@@ -145,5 +207,6 @@ void *nodoka_exec(nodoka_context *context) {
     void *ret;
     while (!(ret = nodoka_stepExec(context))) {
     }
+    assert(context->stack == context->stackTop);
     return ret;
 }

@@ -1,3 +1,6 @@
+#ifndef JS_BYTECODE_H
+#define JS_BYTECODE_H
+
 #include "js/js.h"
 
 enum nodoka_bytecode {
@@ -91,10 +94,31 @@ enum nodoka_bytecode {
      */
     NODOKA_BC_STR,
 
+    /**
+     * [] GET
+     * convert the top reference (if it is) to its value
+     */
+    NODOKA_BC_GET,
 
 
+    /**
+     * [] NEG
+     * negate sp0. NaN will still be NaN
+     * @Precondition sp0 is number
+     */
+    NODOKA_BC_NEG,
 
+    NODOKA_BC_NOT,
+
+    NODOKA_BC_L_NOT,
+
+    NODOKA_BC_MUL,
+
+    NODOKA_BC_MOD,
+
+    NODOKA_BC_DIV,
     NODOKA_BC_ADD,
+    NODOKA_BC_SUB,
 
 };
 
@@ -127,3 +151,5 @@ struct nodoka_context {
     nodoka_data **stackLimit;
     size_t insPtr;
 };
+
+#endif

@@ -8,31 +8,45 @@
 
 #include "js/js.h"
 #include "js/bytecode.h"
+#include "js/lex.h"
 
 int main() {
-    /*long size;
-    char *buffer = nodoka_readFile("./test.js", &size);*/
+    long size;
+    char *buffer = nodoka_readFile("./test.js", &size);
 
     nodoka_initConstant();
 
-    nodoka_code *code = nodoka_loadBytecode("./bytecode.nbc");
-    if (!code) {
-        nodoka_code_emitter *seg = nodoka_newCodeEmitter();
-        nodoka_emitBytecode(seg, NODOKA_BC_LOAD_NUM, 1.0);
-        nodoka_emitBytecode(seg, NODOKA_BC_LOAD_NUM, 2.0);
-        nodoka_emitBytecode(seg, NODOKA_BC_STR);
-        nodoka_emitBytecode(seg, NODOKA_BC_ADD);
-        nodoka_emitBytecode(seg, NODOKA_BC_RET);
-        /*for (int i = 0; i < 10; i++) {
-            bool mod = false;
-            mod |= nodoka_peeholePass(seg);
-            mod |= nodoka_nopPass(seg);
-            if (!mod) {
-                break;
-            }
+    nodoka_lex *lex = lex_new(buffer);
+    nodoka_grammar *grammar = grammar_new(lex);
+    nodoka_lex_class *ast = grammar_expr(grammar);
+
+    nodoka_code_emitter *emitter = nodoka_newCodeEmitter();
+    nodoka_codegen(emitter, ast);
+
+    nodoka_emitBytecode(emitter, NODOKA_BC_RET);
+
+    nodoka_code *code = nodoka_packCode(emitter);
+
+
+    /*
+        nodoka_code *code = nodoka_loadBytecode("./bytecode.nbc");
+        if (!code) {
+            nodoka_code_emitter *seg = nodoka_newCodeEmitter();
+            nodoka_emitBytecode(seg, NODOKA_BC_LOAD_NUM, 1.0);
+            nodoka_emitBytecode(seg, NODOKA_BC_LOAD_NUM, 2.0);
+            nodoka_emitBytecode(seg, NODOKA_BC_STR);
+            nodoka_emitBytecode(seg, NODOKA_BC_ADD);
+            nodoka_emitBytecode(seg, NODOKA_BC_RET);
+            /*for (int i = 0; i < 10; i++) {
+                bool mod = false;
+                mod |= nodoka_peeholePass(seg);
+                mod |= nodoka_nopPass(seg);
+                if (!mod) {
+                    break;
+                }
+            }* /
+            code = nodoka_packCode(seg);
         }*/
-        code = nodoka_packCode(seg);
-    }
 
     //nodoka_storeBytecode("./bytecode.nbc", code);
 

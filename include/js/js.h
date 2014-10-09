@@ -15,6 +15,8 @@ enum nodoka_data_type {
     NODOKA_STRING = 0x10,
     NODOKA_OBJECT = 0x20,
 
+    NODOKA_REFERENCE = 0x40,
+
     NODOKA_CODE = 0xFF,
 };
 
@@ -60,6 +62,9 @@ nodoka_number *nodoka_newNumber(double val);
 nodoka_data *nodoka_toPrimitive(nodoka_data *value);
 nodoka_data *nodoka_toBoolean(nodoka_data *value);
 nodoka_number *nodoka_toNumber(nodoka_data *value);
+int32_t nodoka_toInt32(nodoka_number *value);
+uint32_t nodoka_toUint32(nodoka_number *value);
+int16_t nodoka_toInt16(nodoka_number *value);
 nodoka_string *nodoka_toString(nodoka_data *value);
 
 /* vm/string.c */
@@ -81,6 +86,10 @@ extern nodoka_string *nodoka_infStr;
 extern nodoka_string *nodoka_negInfStr;
 extern nodoka_string *nodoka_zeroStr;
 
-#define assertPrimitive(data) assert((data)->type&(NODOKA_UNDEF|NODOKA_NULL|NODOKA_BOOL|NODOKA_NUMBER|NODOKA_STRING))
+#define NODOKA_TYPE(data) (((nodoka_data*)(data))->type)
+#define assertType(data, type) do{enum nodoka_data_type __type=NODOKA_TYPE(data);assert((__type&(type))==__type);}while(0)
+#define assertPrimitive(data) assertType(data, NODOKA_UNDEF|NODOKA_NULL|NODOKA_BOOL|NODOKA_NUMBER|NODOKA_STRING)
+#define assertNumber(data) assertType(data, NODOKA_NUMBER)
+#define assertBoolean(data) assertType(data, NODOKA_BOOL)
 
 #endif

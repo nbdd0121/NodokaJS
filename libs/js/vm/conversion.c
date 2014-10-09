@@ -151,6 +151,24 @@ nodoka_number *nodoka_toNumber(nodoka_data *value) {
     }
 }
 
+int32_t nodoka_toInt32(nodoka_number *value) {
+    double number = value->value;
+    if (isnan(number) || isinf(number) || number == 0) {
+        return 0;
+    }
+    double posInt = (number > 0 ? 1 : -1) * floor(fabs(number));
+    int32_t int32bit = (int32_t)posInt;
+    return int32bit;
+}
+
+uint32_t nodoka_toUint32(nodoka_number *value) {
+    return (uint32_t)nodoka_toInt32(value);
+}
+
+int16_t nodoka_toInt16(nodoka_number *value) {
+    return (int16_t)nodoka_toInt32(value);
+}
+
 nodoka_string *nodoka_toString(nodoka_data *value) {
     switch (value->type) {
         case NODOKA_UNDEF:

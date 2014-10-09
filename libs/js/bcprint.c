@@ -46,6 +46,10 @@ void nodoka_printBytecode(nodoka_code *codeseg) {
         enum nodoka_bytecode bc = fetchByte(codeseg, &i);
         printf("  ");
         switch (bc) {
+                DECL_OP(UNDEF);
+                DECL_OP(NULL);
+                DECL_OP(TRUE);
+                DECL_OP(FALSE);
             case NODOKA_BC_LOAD_STR: {
                 uint16_t index = fetch16(codeseg, &i);
                 printf("LOAD_STR #%d (\"", index);
@@ -58,11 +62,21 @@ void nodoka_printBytecode(nodoka_code *codeseg) {
                 break;
             }
             DECL_OP(NOP);
+            DECL_OP(POP);
             DECL_OP(XCHG);
             DECL_OP(RET);
             DECL_OP(BOOL);
+            DECL_OP(NUM);
             DECL_OP(STR);
+            DECL_OP(GET);
+            DECL_OP(NEG);
+            DECL_OP(NOT);
+            DECL_OP(L_NOT);
+            DECL_OP(MUL);
+            DECL_OP(MOD);
+            DECL_OP(DIV);
             DECL_OP(ADD);
+            DECL_OP(SUB);
             default: assert(0);
         }
         printf("\n");
