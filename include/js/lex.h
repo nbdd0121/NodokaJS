@@ -67,8 +67,8 @@ enum nodoka_token_type {
     NODOKA_TOKEN_L_AND = NODOKA_TOKEN_AND | DOUBLE_FLAG,
     NODOKA_TOKEN_L_OR = NODOKA_TOKEN_OR | DOUBLE_FLAG,
 
-    NODOKA_TOKEN_FULL_EQ = OTHER_FLAG,
-    NODOKA_TOKEN_FULL_INEQ,
+    NODOKA_TOKEN_STRICT_EQ = OTHER_FLAG,
+    NODOKA_TOKEN_STRICT_INEQ,
     NODOKA_TOKEN_STR,
     NODOKA_TOKEN_NUM,
     NODOKA_TOKEN_ID,
@@ -150,25 +150,27 @@ enum nodoka_binary_node_type {
     NODOKA_DIV_NODE,
     NODOKA_ADD_NODE,
     NODOKA_SUB_NODE,
+    NODOKA_SHL_NODE,
+    NODOKA_SHR_NODE,
+    NODOKA_USHR_NODE,
+    NODOKA_LT_NODE,
+    NODOKA_GT_NODE,
+    NODOKA_LTEQ_NODE,
+    NODOKA_GTEQ_NODE,
 
-    NODOKA_SHL_NODE,//TODO
-    NODOKA_SHR_NODE,//TODO
-    NODOKA_USHR_NODE,//TODO
-    NODOKA_LT_NODE,//TODO
-    NODOKA_GT_NODE,//TODO
-    NODOKA_LTEQ_NODE,//TODO
-    NODOKA_GTEQ_NODE,//TODO
     NODOKA_INSTANCEOF_NODE,//TODO
     NODOKA_IN_NODE,//TODO
-    NODOKA_EQ_NODE,//TODO
-    NODOKA_INEQ_NODE,//TODO
-    NODOKA_FULL_EQ_NODE,//TODO
-    NODOKA_FULL_INEQ_NODE,//TODO
-    NODOKA_AND_NODE,//TODO
-    NODOKA_XOR_NODE,//TODO
-    NODOKA_OR_NODE,//TODO
-    NODOKA_L_AND_NODE,//TODO
+
+    NODOKA_EQ_NODE,
+    NODOKA_INEQ_NODE,
+    NODOKA_STRICT_EQ_NODE,
+    NODOKA_STRICT_INEQ_NODE,
+    NODOKA_AND_NODE,
+    NODOKA_XOR_NODE,
+    NODOKA_OR_NODE,
+    NODOKA_L_AND_NODE,
     NODOKA_L_OR_NODE,//TODO
+
     NODOKA_ASSIGN_NODE,//TODO
     NODOKA_MUL_ASSIGN_NODE,//TODO
     NODOKA_DIV_ASSIGN_NODE,//TODO
@@ -181,7 +183,8 @@ enum nodoka_binary_node_type {
     NODOKA_AND_ASSIGN_NODE,//TODO
     NODOKA_XOR_ASSIGN_NODE,//TODO
     NODOKA_OR_ASSIGN_NODE,//TODO
-    NODOKA_COMMA_NODE,//TODO
+
+    NODOKA_COMMA_NODE,
 
     BLOCK_STMT_LIST,
 };
@@ -258,10 +261,9 @@ typedef struct struct_grammar nodoka_grammar;
 
 nodoka_lex *lex_new(char *chr);
 nodoka_token *lex_next(nodoka_lex *lex);
-
 nodoka_grammar *grammar_new(nodoka_lex *lex);
-
 void nodoka_codegen(nodoka_code_emitter *emitter, nodoka_lex_class *node);
+void nodoka_disposeLexNode(nodoka_lex_class *node);
 
 #endif
 

@@ -79,12 +79,59 @@ void nodoka_emitBytecode(nodoka_code_emitter *emitter, uint8_t bc, ...) {
             nodoka_emit64(emitter, imm64);
             break;
         }
+        case NODOKA_BC_JMP:
+        case NODOKA_BC_JT: {
+            nodoka_relocatable *rel = va_arg(ap, nodoka_relocatable *);
+            if (rel)
+                *rel = emitter->bytecodeLength;
+            nodoka_emit16(emitter, 0);
+            break;
+        }
     }
     va_end(ap);
 }
 
+nodoka_label nodoka_putLabel(nodoka_code_emitter *emitter) {
+    return emitter->bytecodeLength;
+}
+
+void nodoka_relocate(nodoka_code_emitter *emitter, nodoka_relocatable rel, nodoka_label label) {
+    emitter->bytecode[rel] = (label >> 8) & 0xFF;
+    emitter->bytecode[rel + 1] = label & 0xFF;
+}
+
+void nodoka_stripEmitter(nodoka_code_emitter *emitter) {
+    emitter->stringPool = realloc(emitter->stringPool, emitter->strPoolLength);
+    emitter->codePool = realloc(emitter->codePool, emitter->codePoolLength);
+    emitter->bytecode = realloc(emitter->bytecode, emitter->bytecodeLength);
+    emitter->strPoolCapacity = emitter->strPoolLength;
+    emitter->codePoolCapacity = emitter->codePoolLength;
+    emitter->bytecodeCapacity = emitter->bytecodeLength;
+}
+
+void nodoka_freeEmitter(nodoka_code_emitter *emitter) {
+    free(emitter->stringPool);
+    free(emitter->codePool);
+    free(emitter->bytecode);
+    free(emitter);
+}
+
+void nodoka_rewindEmitter(nodoka_code_emitter *emitter) {
+    emitter->strPoolLength = 0;
+    emitter->codePoolLength = 0;
+    emitter->bytecodeLength = 0;
+}
+
+void nodoka_xchgEmitter(nodoka_code_emitter *e1, nodoka_code_emitter *e2) {
+    nodoka_code_emitter tmp;
+    memcpy(&tmp, e1, sizeof(nodoka_code_emitter));
+    memcpy(e1, e2, sizeof(nodoka_code_emitter));
+    memcpy(e2, &tmp, sizeof(nodoka_code_emitter));
+}
+
 nodoka_code *nodoka_packCode(nodoka_code_emitter *emitter) {
     nodoka_code *code = (nodoka_code *)nodoka_new_data(NODOKA_CODE);
+    nodoka_stripEmitter(emitter);
     code->stringPool = emitter->stringPool;
     code->codePool = emitter->codePool;
     code->bytecode = emitter->bytecode;

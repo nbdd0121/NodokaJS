@@ -51,6 +51,10 @@ static nodoka_token *next(nodoka_grammar *gmr) {
     }
 }
 
+static void disposeNext(nodoka_grammar *gmr) {
+    nodoka_disposeLexNode((nodoka_lex_class *)next(gmr));
+}
+
 static void pushback(nodoka_grammar *gmr, nodoka_token *token) {
     gmr->listLen++;
     token->next = gmr->next;
@@ -391,7 +395,7 @@ produceExpr:
 #define BINARY_FOOT(_previous) default:\
     return cur;\
     }\
-    next(gmr);\
+    disposeNext(gmr);\
     nodoka_binary_node *node = newBinaryNode(type);\
     node->_1 = cur;\
     node->_2 = grammar_##_previous(gmr);\
@@ -439,8 +443,8 @@ BINARY_FOOT(shiftExpr)
 static BINARY_HEAD(eqExpr, relExpr)
 BINARY_CASE(EQ)
 BINARY_CASE(INEQ)
-BINARY_CASE(FULL_EQ)
-BINARY_CASE(FULL_INEQ)
+BINARY_CASE(STRICT_EQ)
+BINARY_CASE(STRICT_INEQ)
 BINARY_FOOT(relExpr)
 
 static BINARY_1(andExpr, eqExpr, AND)

@@ -114,7 +114,19 @@ enum nodoka_bytecode {
     NODOKA_BC_DIV,
     NODOKA_BC_ADD,
     NODOKA_BC_SUB,
+    NODOKA_BC_SHL,
+    NODOKA_BC_SHR,
+    NODOKA_BC_USHR,
+    NODOKA_BC_LT,
+    NODOKA_BC_LTEQ,
+    NODOKA_BC_EQ,
+    NODOKA_BC_S_EQ,
+    NODOKA_BC_AND,
+    NODOKA_BC_OR,
+    NODOKA_BC_XOR,
 
+    NODOKA_BC_JMP,
+    NODOKA_BC_JT,
 };
 
 struct nodoka_code {
@@ -146,5 +158,17 @@ struct nodoka_context {
     nodoka_data **stackLimit;
     size_t insPtr;
 };
+
+typedef uint16_t nodoka_relocatable;
+typedef uint16_t nodoka_label;
+
+nodoka_code_emitter *nodoka_newCodeEmitter(void);
+void nodoka_emitBytecode(nodoka_code_emitter *codeseg, uint8_t bc, ...);
+nodoka_label nodoka_putLabel(nodoka_code_emitter *emitter);
+void nodoka_relocate(nodoka_code_emitter *emitter, nodoka_relocatable rel, nodoka_label label);
+void nodoka_xchgEmitter(nodoka_code_emitter *, nodoka_code_emitter *);
+void nodoka_freeEmitter(nodoka_code_emitter *emitter);
+nodoka_code *nodoka_packCode(nodoka_code_emitter *emitter);
+nodoka_code_emitter *nodoka_unpackCode(nodoka_code *code);
 
 #endif

@@ -38,17 +38,8 @@ typedef struct nodoka_code nodoka_code;
 typedef struct nodoka_code_emitter nodoka_code_emitter;
 typedef struct nodoka_context nodoka_context;
 
-nodoka_code_emitter *nodoka_newCodeEmitter(void);
-void nodoka_emitBytecode(nodoka_code_emitter *codeseg, uint8_t bc, ...);
-nodoka_code *nodoka_packCode(nodoka_code_emitter *emitter);
-nodoka_code_emitter *nodoka_unpackCode(nodoka_code *code);
-
 nodoka_context *nodoka_newContext(nodoka_code *code);
 void *nodoka_exec(nodoka_context *context);
-
-bool nodoka_nopPass(nodoka_code_emitter *codeseg);
-bool nodoka_peeholePass(nodoka_code_emitter *codeseg);
-bool nodoka_convPass(nodoka_code_emitter *emitter);
 
 void nodoka_printBytecode(nodoka_code *);
 
@@ -93,6 +84,7 @@ extern nodoka_string *nodoka_zeroStr;
 #define assertType(data, type) do{enum nodoka_data_type __type=NODOKA_TYPE(data);assert((__type&(type))==__type);}while(0)
 #define assertPrimitive(data) assertType(data, NODOKA_UNDEF|NODOKA_NULL|NODOKA_BOOL|NODOKA_NUMBER|NODOKA_STRING)
 #define assertNumber(data) assertType(data, NODOKA_NUMBER)
+#define assertString(data) assertType(data, NODOKA_STRING)
 #define assertBoolean(data) assertType(data, NODOKA_BOOL)
 
 #endif

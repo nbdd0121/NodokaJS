@@ -267,7 +267,7 @@ static nodoka_token *stateDefault(nodoka_lex *lex) {
                 lex->next(lex);
                 if (lex->lookahead(lex) == '=') {
                     lex->next(lex);
-                    return newToken(next == '=' ? NODOKA_TOKEN_FULL_EQ : NODOKA_TOKEN_FULL_INEQ);
+                    return newToken(next == '=' ? NODOKA_TOKEN_STRICT_EQ : NODOKA_TOKEN_STRICT_INEQ);
                 } else {
                     return newToken(next | ASSIGN_FLAG);
                 }

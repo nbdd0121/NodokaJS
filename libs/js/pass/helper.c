@@ -21,3 +21,5 @@ uint64_t nodoka_pass_fetch64(nodoka_code_emitter *context, size_t *ptr) {
     ret |= nodoka_pass_fetch32(context, ptr);
     return ret;
 }
+
+

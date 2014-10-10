@@ -36,4 +36,10 @@ static inline bool bitmap_set(bitmap_t *b, size_t index) {
     return !!ret;
 }
 
+static inline bool bitmap_get(bitmap_t *b, size_t index) {
+    unsigned char mask = (unsigned char)(1 << (index & 7));
+    bool ret = b[index >> 3] & mask;
+    return !!ret;
+}
+
 #endif

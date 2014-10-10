@@ -44,12 +44,8 @@ void nodoka_printBytecode(nodoka_code *codeseg) {
     printf("Bytecode:\n");
     for (size_t i = 0; i < codeseg->bytecodeLength; ) {
         enum nodoka_bytecode bc = fetchByte(codeseg, &i);
-        printf("  ");
+        printf("%5d ", i - 1);
         switch (bc) {
-                DECL_OP(UNDEF);
-                DECL_OP(NULL);
-                DECL_OP(TRUE);
-                DECL_OP(FALSE);
             case NODOKA_BC_LOAD_STR: {
                 uint16_t index = fetch16(codeseg, &i);
                 printf("LOAD_STR #%d (\"", index);
@@ -61,11 +57,25 @@ void nodoka_printBytecode(nodoka_code *codeseg) {
                 printf("LOAD_NUM %lf", int2double(fetch64(codeseg, &i)));
                 break;
             }
+            case NODOKA_BC_JT: {
+                printf("JT %d", fetch16(codeseg, &i));
+                break;
+            }
+            case NODOKA_BC_JMP: {
+                printf("JMP %d", fetch16(codeseg, &i));
+                break;
+            }
+            DECL_OP(UNDEF);
+            DECL_OP(NULL);
+            DECL_OP(TRUE);
+            DECL_OP(FALSE);
             DECL_OP(NOP);
+            DECL_OP(DUP);
             DECL_OP(POP);
             DECL_OP(XCHG);
             DECL_OP(RET);
             DECL_OP(BOOL);
+            DECL_OP(PRIM);
             DECL_OP(NUM);
             DECL_OP(STR);
             DECL_OP(GET);
@@ -77,6 +87,18 @@ void nodoka_printBytecode(nodoka_code *codeseg) {
             DECL_OP(DIV);
             DECL_OP(ADD);
             DECL_OP(SUB);
+            DECL_OP(SHL);
+            DECL_OP(SHR);
+            DECL_OP(USHR);
+            DECL_OP(LT);
+            DECL_OP(LTEQ);
+            DECL_OP(EQ);
+            DECL_OP(S_EQ);
+            DECL_OP(AND);
+            DECL_OP(OR);
+            DECL_OP(XOR);
+
+
             default: assert(0);
         }
         printf("\n");

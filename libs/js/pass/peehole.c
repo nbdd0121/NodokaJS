@@ -4,25 +4,49 @@
 
 #include "js/js.h"
 #include "js/bytecode.h"
+#include "js/pass.h"
+
+#include "util/double.h"
 
 #define SEQ_NUM (sizeof(sequences)/sizeof(sequences[0]))
 
-bool nodoka_peeholePass(nodoka_code_emitter *codeseg) {
+bool nodoka_peeholePass(nodoka_code_emitter *emitter, nodoka_code_emitter *target, size_t start, size_t end) {
     bool mod = false;
-    for (int i = 0; i < codeseg->bytecodeLength; i++) {
-        enum nodoka_bytecode bc = codeseg->bytecode[i];
+    for (size_t i = start; i < end;) {
+        enum nodoka_bytecode bc = nodoka_pass_fetch8(emitter, &i);
         switch (bc) {
-            case NODOKA_BC_LOAD_STR: i += 2; break;
-            case NODOKA_BC_LOAD_NUM: i += 8; break;
-            case NODOKA_BC_XCHG: {
-                if (codeseg->bytecode[i + 1]) {
-                    codeseg->bytecode[i] = NODOKA_BC_NOP;
-                    codeseg->bytecode[i + 1] = NODOKA_BC_NOP;
+            case NODOKA_BC_LOAD_STR: {
+                uint16_t offset = nodoka_pass_fetch16(emitter, &i);
+                /* LOAD_STR [imm16] POP can be removed with no side-effect */
+                if (i < end && emitter->bytecode[i] == NODOKA_BC_POP) {
                     i++;
+                    break;
                 }
+                nodoka_emitBytecode(target, bc, emitter->stringPool[offset]);
                 break;
             }
-            default: break;
+            case NODOKA_BC_LOAD_NUM: {
+                double val = int2double(nodoka_pass_fetch64(emitter, &i));
+                /* LOAD_NUM [imm64] POP can be removed with no side-effect */
+                if (i < end && emitter->bytecode[i] == NODOKA_BC_POP) {
+                    i++;
+                    break;
+                }
+                nodoka_emitBytecode(target, bc, val);
+                break;
+            }
+            case NODOKA_BC_XCHG: {
+                /* XCHG XCHG can be removed with no side-effect */
+                if (i < end && emitter->bytecode[i] == NODOKA_BC_XCHG) {
+                    i++;
+                    break;
+                }
+                goto emitToTarget;
+            }
+            default:
+emitToTarget:
+                nodoka_emitBytecode(target, bc);
+                break;
         }
     }
     return mod;
