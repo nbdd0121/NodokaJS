@@ -460,7 +460,7 @@ static nodoka_lex_class *grammar_condExpr(nodoka_grammar *gmr) {
         nodoka_lex_class *t_exp = grammar_assignExpr(gmr);
         expect(gmr, NODOKA_TOKEN_COLON);
         nodoka_lex_class *f_exp = grammar_assignExpr(gmr);
-        nodoka_ternary_node *ret = newTernaryNode(COND_NODE);
+        nodoka_ternary_node *ret = newTernaryNode(NODOKA_COND_NODE);
         ret->_1 = node;
         ret->_2 = t_exp;
         ret->_3 = f_exp;

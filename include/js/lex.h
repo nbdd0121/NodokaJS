@@ -169,7 +169,7 @@ enum nodoka_binary_node_type {
     NODOKA_XOR_NODE,
     NODOKA_OR_NODE,
     NODOKA_L_AND_NODE,
-    NODOKA_L_OR_NODE,//TODO
+    NODOKA_L_OR_NODE,
 
     NODOKA_ASSIGN_NODE,//TODO
     NODOKA_MUL_ASSIGN_NODE,//TODO
@@ -190,7 +190,8 @@ enum nodoka_binary_node_type {
 };
 
 enum nodoka_ternary_node_type {
-    COND_NODE,//TODO
+    NODOKA_COND_NODE,
+
     IF_STMT,
 };
 

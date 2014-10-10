@@ -20,34 +20,36 @@ bool nodoka_peeholePass(nodoka_code_emitter *emitter, nodoka_code_emitter *targe
                 /* LOAD_STR [imm16] POP can be removed with no side-effect */
                 if (i < end && emitter->bytecode[i] == NODOKA_BC_POP) {
                     i++;
-                    break;
+                } else {
+                    nodoka_emitBytecode(target, bc, emitter->stringPool[offset]);
                 }
-                nodoka_emitBytecode(target, bc, emitter->stringPool[offset]);
-                break;
+                continue;
             }
             case NODOKA_BC_LOAD_NUM: {
                 double val = int2double(nodoka_pass_fetch64(emitter, &i));
                 /* LOAD_NUM [imm64] POP can be removed with no side-effect */
                 if (i < end && emitter->bytecode[i] == NODOKA_BC_POP) {
                     i++;
-                    break;
+                } else {
+                    nodoka_emitBytecode(target, bc, val);
                 }
-                nodoka_emitBytecode(target, bc, val);
-                break;
+                continue;
             }
             case NODOKA_BC_XCHG: {
                 /* XCHG XCHG can be removed with no side-effect */
                 if (i < end && emitter->bytecode[i] == NODOKA_BC_XCHG) {
                     i++;
-                    break;
+                    continue;
                 }
-                goto emitToTarget;
+                break;
+            }
+            case NODOKA_BC_NOP: {
+                continue;
             }
             default:
-emitToTarget:
-                nodoka_emitBytecode(target, bc);
                 break;
         }
+        nodoka_emitBytecode(target, bc);
     }
     return mod;
 }

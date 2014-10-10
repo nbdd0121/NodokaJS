@@ -235,6 +235,28 @@ static void codegenBinary(nodoka_code_emitter *emitter, nodoka_binary_node *node
     }
 }
 
+void codegenTernary(nodoka_code_emitter *emitter, nodoka_ternary_node *node) {
+    switch (node->type) {
+        case NODOKA_COND_NODE: {
+            nodoka_codegen(emitter, node->_1);
+            nodoka_emitBytecode(emitter, NODOKA_BC_GET);
+            nodoka_emitBytecode(emitter, NODOKA_BC_BOOL);
+            nodoka_relocatable t, c;
+            nodoka_emitBytecode(emitter, NODOKA_BC_JT, &t);
+            nodoka_codegen(emitter, node->_3);
+            nodoka_emitBytecode(emitter, NODOKA_BC_GET);
+            nodoka_emitBytecode(emitter, NODOKA_BC_JMP, &c);
+            nodoka_relocate(emitter, t, nodoka_putLabel(emitter));
+            nodoka_codegen(emitter, node->_2);
+            nodoka_emitBytecode(emitter, NODOKA_BC_GET);
+            nodoka_relocate(emitter, c, nodoka_putLabel(emitter));
+            break;
+        }
+        default: assert(0);
+    }
+}
+
+
 void nodoka_codegen(nodoka_code_emitter *emitter, nodoka_lex_class *node) {
     switch (node->clazz) {
         case NODOKA_LEX_TOKEN: {
@@ -247,6 +269,10 @@ void nodoka_codegen(nodoka_code_emitter *emitter, nodoka_lex_class *node) {
         }
         case NODOKA_LEX_BINARY_NODE: {
             codegenBinary(emitter, (nodoka_binary_node *)node);
+            break;
+        }
+        case NODOKA_LEX_TERNARY_NODE: {
+            codegenTernary(emitter, (nodoka_ternary_node *)node);
             break;
         }
         default: assert(0);

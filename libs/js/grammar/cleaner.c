@@ -1,3 +1,5 @@
+#include "c/stdlib.h"
+
 #include "js/lex.h"
 
 void nodoka_disposeLexNode(nodoka_lex_class *node) {
@@ -23,6 +25,14 @@ void nodoka_disposeLexNode(nodoka_lex_class *node) {
             nodoka_binary_node *n = (nodoka_binary_node *)node;
             nodoka_disposeLexNode(n->_1);
             nodoka_disposeLexNode(n->_2);
+            free(n);
+            break;
+        }
+        case NODOKA_LEX_TERNARY_NODE: {
+            nodoka_ternary_node *n = (nodoka_ternary_node *)node;
+            nodoka_disposeLexNode(n->_1);
+            nodoka_disposeLexNode(n->_2);
+            nodoka_disposeLexNode(n->_3);
             free(n);
             break;
         }
