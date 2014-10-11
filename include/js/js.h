@@ -40,6 +40,9 @@ typedef struct nodoka_context nodoka_context;
 
 nodoka_context *nodoka_newContext(nodoka_code *code);
 void *nodoka_exec(nodoka_context *context);
+int8_t nodoka_absRelComp(nodoka_data *sp1, nodoka_data *sp0);
+bool nodoka_strictEqComp(nodoka_data *x, nodoka_data *y);
+bool nodoka_absEqComp(nodoka_data *x, nodoka_data *y);
 
 void nodoka_printBytecode(nodoka_code *);
 

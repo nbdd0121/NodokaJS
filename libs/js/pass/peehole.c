@@ -61,6 +61,10 @@ bool nodoka_peeholePass(nodoka_code_emitter *emitter, nodoka_code_emitter *targe
                     i++;
                     mod = true;
                     continue;
+                } else if (i + 1 < end && emitter->bytecode[i] == NODOKA_BC_POP && emitter->bytecode[i + 1] == NODOKA_BC_POP) {
+                    /* XCHG POP POP can be reduced to POP POP with no side-effect */
+                    mod = true;
+                    continue;
                 }
                 break;
             }

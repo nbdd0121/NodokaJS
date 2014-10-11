@@ -29,7 +29,7 @@ int main(int argc, char **argv) {
                     s = false;
                     name += 3;
                 }
-                if (strcmp(name, "peehole-optimizer") == 0) {
+                if (strcmp(name, "peehole") == 0) {
                     peehole = s;
                 } else if (strcmp(name, "conversion-optimizer") == 0) {
                     conv = s;

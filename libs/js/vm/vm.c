@@ -53,7 +53,7 @@ static uint64_t fetch64(nodoka_context *context) {
     return ret;
 }
 
-static int8_t absRelComp(nodoka_data *sp1, nodoka_data *sp0) {
+int8_t nodoka_absRelComp(nodoka_data *sp1, nodoka_data *sp0) {
     assertPrimitive(sp1);
     assertPrimitive(sp0);
     if (sp1->type != NODOKA_STRING || sp0->type != NODOKA_STRING) {
@@ -79,7 +79,7 @@ static int8_t absRelComp(nodoka_data *sp1, nodoka_data *sp0) {
     }
 }
 
-static bool strictEqComp(nodoka_data *x, nodoka_data *y) {
+bool nodoka_strictEqComp(nodoka_data *x, nodoka_data *y) {
     if (x->type != y->type) {
         return false;
     }
@@ -110,25 +110,25 @@ static bool strictEqComp(nodoka_data *x, nodoka_data *y) {
     }
 }
 
-static bool absEqComp(nodoka_data *x, nodoka_data *y) {
+bool nodoka_absEqComp(nodoka_data *x, nodoka_data *y) {
     if (x->type == y->type) {
-        return strictEqComp(x, y);
+        return nodoka_strictEqComp(x, y);
     } else if (x->type == NODOKA_NULL && y->type == NODOKA_UNDEF) {
         return true;
     } else if (x->type == NODOKA_UNDEF && y->type == NODOKA_NULL) {
         return true;
     } else if (x->type == NODOKA_NUMBER && y->type == NODOKA_STRING) {
-        return absEqComp(x, (nodoka_data *)nodoka_toNumber(y));
+        return nodoka_absEqComp(x, (nodoka_data *)nodoka_toNumber(y));
     } else if (x->type == NODOKA_STRING && y->type == NODOKA_NUMBER) {
-        return absEqComp((nodoka_data *)nodoka_toNumber(x), y);
+        return nodoka_absEqComp((nodoka_data *)nodoka_toNumber(x), y);
     } else if (x->type == NODOKA_BOOL) {
-        return absEqComp((nodoka_data *)nodoka_toNumber(x), y);
+        return nodoka_absEqComp((nodoka_data *)nodoka_toNumber(x), y);
     } else if (y->type == NODOKA_BOOL) {
-        return absEqComp(x, (nodoka_data *)nodoka_toNumber(y));
+        return nodoka_absEqComp(x, (nodoka_data *)nodoka_toNumber(y));
     } else if ((x->type == NODOKA_STRING || x->type == NODOKA_NUMBER) && y->type == NODOKA_OBJECT) {
-        return absEqComp(x, nodoka_toPrimitive(y));
+        return nodoka_absEqComp(x, nodoka_toPrimitive(y));
     } else if ((y->type == NODOKA_STRING || y->type == NODOKA_NUMBER) && x->type == NODOKA_OBJECT) {
-        return absEqComp(nodoka_toPrimitive(x), y);
+        return nodoka_absEqComp(nodoka_toPrimitive(x), y);
     } else {
         return false;
     }
@@ -238,7 +238,7 @@ void *nodoka_stepExec(nodoka_context *context) {
             nodoka_number *sp1 = (nodoka_number *)nodoka_pop(context);
             assertNumber(sp1);
             assertNumber(sp0);
-            nodoka_push(context, (nodoka_data *)nodoka_newNumber(sp0->value * sp1->value));
+            nodoka_push(context, (nodoka_data *)nodoka_newNumber(sp1->value * sp0->value));
             break;
         }
         case NODOKA_BC_MOD: {
@@ -246,7 +246,7 @@ void *nodoka_stepExec(nodoka_context *context) {
             nodoka_number *sp1 = (nodoka_number *)nodoka_pop(context);
             assertNumber(sp1);
             assertNumber(sp0);
-            nodoka_push(context, (nodoka_data *)nodoka_newNumber(fmod(sp0->value, sp1->value)));
+            nodoka_push(context, (nodoka_data *)nodoka_newNumber(fmod(sp1->value, sp0->value)));
             break;
         }
         case NODOKA_BC_DIV: {
@@ -254,7 +254,7 @@ void *nodoka_stepExec(nodoka_context *context) {
             nodoka_number *sp1 = (nodoka_number *)nodoka_pop(context);
             assertNumber(sp1);
             assertNumber(sp0);
-            nodoka_push(context, (nodoka_data *)nodoka_newNumber(sp0->value / sp1->value));
+            nodoka_push(context, (nodoka_data *)nodoka_newNumber(sp1->value / sp0->value));
             break;
         }
         case NODOKA_BC_ADD: {
@@ -278,7 +278,7 @@ void *nodoka_stepExec(nodoka_context *context) {
             nodoka_number *sp1 = (nodoka_number *)nodoka_pop(context);
             assertNumber(sp1);
             assertNumber(sp0);
-            nodoka_push(context, (nodoka_data *)nodoka_newNumber(sp0->value - sp1->value));
+            nodoka_push(context, (nodoka_data *)nodoka_newNumber(sp1->value - sp0->value));
             break;
         }
         case NODOKA_BC_SHL: {
@@ -314,28 +314,28 @@ void *nodoka_stepExec(nodoka_context *context) {
         case NODOKA_BC_LT: {
             nodoka_data *sp0 = nodoka_pop(context);
             nodoka_data *sp1 = nodoka_pop(context);
-            int8_t ret = absRelComp(sp1, sp0);
+            int8_t ret = nodoka_absRelComp(sp1, sp0);
             nodoka_push(context, (ret == 1) ? nodoka_true : nodoka_false);
             break;
         }
         case NODOKA_BC_LTEQ: {
             nodoka_data *sp0 = nodoka_pop(context);
             nodoka_data *sp1 = nodoka_pop(context);
-            int8_t ret = absRelComp(sp0, sp1);
+            int8_t ret = nodoka_absRelComp(sp0, sp1);
             nodoka_push(context, (ret == 0) ? nodoka_true : nodoka_false);
             break;
         }
         case NODOKA_BC_EQ: {
             nodoka_data *sp0 = nodoka_pop(context);
             nodoka_data *sp1 = nodoka_pop(context);
-            bool ret = absEqComp(sp1, sp0);
+            bool ret = nodoka_absEqComp(sp1, sp0);
             nodoka_push(context, ret ? nodoka_true : nodoka_false);
             break;
         }
         case NODOKA_BC_S_EQ: {
             nodoka_data *sp0 = nodoka_pop(context);
             nodoka_data *sp1 = nodoka_pop(context);
-            bool ret = strictEqComp(sp1, sp0);
+            bool ret = nodoka_strictEqComp(sp1, sp0);
             nodoka_push(context, ret ? nodoka_true : nodoka_false);
             break;
         }
