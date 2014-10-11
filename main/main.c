@@ -16,33 +16,58 @@ int main(int argc, char **argv) {
 
     bool peehole = true;
     bool conv = true;
+    bool fold = false;
+    char *path = NULL;
 
     for (int i = 1; i < argc; i++) {
         char *arg = argv[i];
         if (arg[0] == '-') {
-            char *name = &arg[1];
-            bool s = true;
-            if (arg[1] == 'n' && arg[2] == 'o' && arg[3] == '-') {
-                s = false;
-                name += 3;
-            }
-            if (strcmp(name, "peehole-optimizer") == 0) {
-                peehole = s;
-            } else if (strcmp(name, "conversion-optimizer") == 0) {
-                conv = s;
-            } else if (strcmp(name, "optimizer") == 0) {
-                peehole = conv = s;
+            if (arg[1] == '-') {
+                char *name = &arg[2];
+                bool s = true;
+                if (name[0] == 'n' && name[1] == 'o' && name[2] == '-') {
+                    s = false;
+                    name += 3;
+                }
+                if (strcmp(name, "peehole-optimizer") == 0) {
+                    peehole = s;
+                } else if (strcmp(name, "conversion-optimizer") == 0) {
+                    conv = s;
+                } else if (strcmp(name, "constant-folding") == 0) {
+                    fold = s;
+                }  else if (strcmp(name, "optimizer") == 0) {
+                    peehole = conv = fold = s;
+                } else {
+                    printf("NodokaJS: Unknown Option %s\n", arg);
+                }
             } else {
-                printf("NodokaJS: Unknown Option %s\n", arg);
+                switch (arg[1]) {
+                    case 'O': {
+                        peehole = conv = fold = true;
+                        break;
+                    }
+                    default:
+                        printf("NodokaJS: Unknown Option %s\n", arg);
+                }
             }
+        } else {
+            path = arg;
         }
     }
 
+    if (!path) {
+        printf("NodokaJS: No file specified\n");
+        return 1;
+    }
 
     nodoka_initConstant();
 
     size_t size;
-    char *buffer = nodoka_readFile("./test.js", &size);
+    char *buffer = nodoka_readFile(path, &size);
+    if (!buffer) {
+        printf("NodokaJS: Unable to load file from '%s'\n", path);
+        return 1;
+    }
 
     nodoka_lex *lex = lex_new(buffer);
     free(buffer);
@@ -60,6 +85,9 @@ int main(int argc, char **argv) {
         bool mod = false;
         if (conv) {
             mod |= nodoka_intraPcr(emitter, nodoka_convPass);
+        }
+        if (fold) {
+            mod |= nodoka_intraPcr(emitter, nodoka_foldPass);
         }
         if (peehole) {
             mod |= nodoka_intraPcr(emitter, nodoka_peeholePass);
