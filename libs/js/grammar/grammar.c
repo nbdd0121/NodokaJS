@@ -6,6 +6,47 @@
 #include "js/js.h"
 #include "js/lex.h"
 
+
+#define BINARY_HEAD(_name, _previous) nodoka_lex_class *grammar_##_name(nodoka_grammar *gmr) {\
+        nodoka_lex_class *cur = grammar_##_previous(gmr);\
+        while (true) {\
+            uint16_t type;\
+            switch (lookahead(gmr)->type) {
+
+#define BINARY_CASE(_value) case NODOKA_TOKEN_##_value: {\
+    type = NODOKA_##_value##_NODE;\
+    break;\
+}\
+ 
+#define BINARY_FOOT(_previous) default:\
+    return cur;\
+    }\
+    disposeNext(gmr);\
+    nodoka_binary_node *node = newBinaryNode(type);\
+    node->_1 = cur;\
+    node->_2 = grammar_##_previous(gmr);\
+    cur = (nodoka_lex_class *)node;\
+    }\
+    }
+
+#define BINARY_1(_name, _previous, _first) \
+    BINARY_HEAD(_name, _previous)\
+    BINARY_CASE(_first)\
+    BINARY_FOOT(_previous)
+
+#define BINARY_2(_name, _previous, _first, _second) \
+    BINARY_HEAD(_name, _previous)\
+    BINARY_CASE(_first)\
+    BINARY_CASE(_second)\
+    BINARY_FOOT(_previous)
+
+#define BINARY_3(_name, _previous, _first, _second, _third) \
+    BINARY_HEAD(_name, _previous)\
+    BINARY_CASE(_first)\
+    BINARY_CASE(_second)\
+    BINARY_CASE(_third)\
+    BINARY_FOOT(_previous)
+
 typedef struct struct_grammar nodoka_grammar;
 
 struct struct_grammar {
@@ -18,7 +59,7 @@ struct struct_grammar {
 static nodoka_lex_class *grammar_primaryExpr(nodoka_grammar *gmr);
 static nodoka_lex_class *grammar_memberExpr(nodoka_grammar *gmr);
 //static nodoka_lex_class *grammar_arguments(nodoka_grammar *gmr);
-//static nodoka_lex_class *grammar_argumentList(nodoka_grammar *gmr);
+static nodoka_lex_class *grammar_argumentList(nodoka_grammar *gmr);
 static nodoka_lex_class *grammar_leftHandSideExpr(nodoka_grammar *gmr);
 static nodoka_lex_class *grammar_postfixExpr(nodoka_grammar *gmr);
 static nodoka_lex_class *grammar_assignExpr(nodoka_grammar *gmr);
@@ -29,6 +70,10 @@ static nodoka_lex_class *grammar_block(nodoka_grammar *gmr);
 static nodoka_lex_class *grammar_varStmt(nodoka_grammar *gmr);
 static nodoka_lex_class *grammar_exprStmt(nodoka_grammar *gmr);
 static nodoka_lex_class *grammar_ifStmt(nodoka_grammar *gmr);
+static nodoka_lex_class *grammar_doWhile(nodoka_grammar *gmr);
+static nodoka_lex_class *grammar_while(nodoka_grammar *gmr);
+static nodoka_lex_class *grammar_for(nodoka_grammar *gmr);
+static nodoka_lex_class *grammar_throw(nodoka_grammar *gmr);
 
 /*static nodoka_lex_class *grammar_funcDecl(nodoka_grammar *gmr);
 static nodoka_lex_class *grammar_funcExpr(nodoka_grammar *gmr);
@@ -67,6 +112,14 @@ static nodoka_token *lookahead(nodoka_grammar *gmr) {
     return ret;
 }
 
+static nodoka_token *lookaheadRegexp(nodoka_grammar *gmr) {
+    gmr->lex->regexp = true;
+    nodoka_token *ret = next(gmr);
+    pushback(gmr, ret);
+    gmr->lex->regexp = false;
+    return ret;
+}
+
 static nodoka_token *expect(nodoka_grammar *gmr, uint16_t type) {
     nodoka_token *ret = next(gmr);
     if (ret->type != type) {
@@ -76,12 +129,16 @@ static nodoka_token *expect(nodoka_grammar *gmr, uint16_t type) {
     return ret;
 }
 
+static void expectAndDispose(nodoka_grammar *gmr, uint16_t type) {
+    nodoka_disposeLexNode((nodoka_lex_class *)expect(gmr, type));
+}
+
 static bool expectSemicolon(nodoka_grammar *gmr) {
     gmr->lex->regexp = true;
     nodoka_token *nxt = lookahead(gmr);
     gmr->lex->regexp = false;
     if (nxt->type == NODOKA_TOKEN_SEMICOLON) {
-        next(gmr);
+        disposeNext(gmr);
         return true;
     }
     if (nxt->type == NODOKA_TOKEN_RBRACE || nxt->lineBefore) {
@@ -120,12 +177,20 @@ nodoka_ternary_node *newTernaryNode(enum nodoka_ternary_node_type type) {
     return node;
 }
 
+nodoka_node_list *newNodeList(enum nodoka_node_list_type type, size_t length) {
+    nodoka_node_list *node = malloc(sizeof(nodoka_node_list) + sizeof(nodoka_lex_class *)*length);
+    node->base.clazz = NODOKA_LEX_NODE_LIST;
+    node->type = type;
+    node->length = length;
+    return node;
+}
+
 nodoka_grammar *grammar_new(nodoka_lex *lex) {
     nodoka_grammar *gmr = malloc(sizeof(struct struct_grammar));
     gmr->lex = lex;
     gmr->next = NULL;
     gmr->listLen = 0;
-    gmr->noIn = true;
+    gmr->noIn = false;
     return gmr;
 }
 
@@ -242,29 +307,37 @@ static nodoka_lex_class *grammar_memberExpr(nodoka_grammar *gmr) {
 
 /*
  * Arguments := ( ArgumentList_opt )
- * /
-static node_t *grammar_arguments(nodoka_grammar *gmr) {
-    expectAndDispose(gmr, L_PAREN);
-    if (lookahead(gmr)->type != R_PAREN) {
-        node_t *ret = grammar_argumentList(gmr);
-        expectAndDispose(gmr, R_PAREN);
-        return ret;
+ */
+static nodoka_lex_class *grammar_arguments(nodoka_grammar *gmr) {
+    expect(gmr, NODOKA_TOKEN_LPAREN);
+    if (lookahead(gmr)->type != NODOKA_TOKEN_RPAREN) {
+        nodoka_binary_node *ret = (nodoka_binary_node *)grammar_argumentList(gmr);
+        nodoka_binary_node *cur;
+        size_t count;
+        for (count = 1, cur = ret;
+                cur->base.clazz == NODOKA_LEX_BINARY_NODE && cur->type == NODOKA_ARG_LIST_INTERNAL;
+                count++, cur = (nodoka_binary_node *)cur->_1);
+        nodoka_node_list *list = newNodeList(NODOKA_ARG_LIST, count);
+
+        cur = ret;
+        for (size_t i = count - 1; i > 0; i--, cur = (nodoka_binary_node *)cur->_1) {
+            list->_[i] = cur->_2;
+        }
+        list->_[0] = (nodoka_lex_class *)cur;
+
+        expect(gmr, NODOKA_TOKEN_RPAREN);
+        return (nodoka_lex_class *)list;
     }
-    discard(gmr);
+    next(gmr);
     return NULL;
 }
 
-static node_t *grammar_argumentList(nodoka_grammar *gmr) {
-    node_t *first = grammar_assignExpr(gmr);
-    node_t *cur = first;
-    while (lookahead(gmr)->type == COMMA) {
-        discard(gmr);
-        node_t *next = grammar_assignExpr(gmr);
-        cur->next = next;
-        cur = next;
-    }
-    return first;
-}*/
+BINARY_HEAD(argumentList, assignExpr)
+case NODOKA_TOKEN_COMMA: {
+    type = NODOKA_ARG_LIST_INTERNAL;
+    break;
+}
+BINARY_FOOT(assignExpr);
 
 /*
  * LeftHandSideExpression := MemberExpression
@@ -300,16 +373,14 @@ static nodoka_lex_class *grammar_leftHandSideExpr(nodoka_grammar *gmr) {
                 cur = (nodoka_lex_class *)node;
                 break;
             }
-            /*
-            case L_PAREN: {
-                node_t *args = grammar_arguments(gmr);
-                call_expr_node_t *node =
-                    (call_expr_node_t *)createNode(CALL_EXPR_NODE, sizeof(call_expr_node_t));
-                node->expr = cur;
-                node->args = args;
-                cur = (node_t *)node;
+            case NODOKA_TOKEN_LPAREN: {
+                nodoka_lex_class *args = grammar_arguments(gmr);
+                nodoka_binary_node *node = (nodoka_binary_node *)newBinaryNode(NODOKA_CALL_NODE);
+                node->_1 = cur;
+                node->_2 = args;
+                cur = (nodoka_lex_class *)node;
                 break;
-            }*/
+            }
             default:
                 return cur;
         }
@@ -326,12 +397,12 @@ static nodoka_lex_class *grammar_postfixExpr(nodoka_grammar *gmr) {
 
     if (nxt->type == NODOKA_TOKEN_INC) {
         next(gmr);
-        nodoka_unary_node *node = newUnaryNode(POST_INC_NODE);
+        nodoka_unary_node *node = newUnaryNode(NODOKA_POST_INC_NODE);
         node->_1 = expr;
         return (nodoka_lex_class *)node;
     } else if (nxt->type == NODOKA_TOKEN_DEC) {
         next(gmr);
-        nodoka_unary_node *node = newUnaryNode(POST_DEC_NODE);
+        nodoka_unary_node *node = newUnaryNode(NODOKA_POST_DEC_NODE);
         node->_1 = expr;
         return (nodoka_lex_class *)node;
     }
@@ -346,7 +417,7 @@ static nodoka_lex_class *grammar_unaryExpr(nodoka_grammar *gmr) {
     gmr->lex->regexp = false;
     switch (lh->type) {
         case NODOKA_TOKEN_DELETE:
-            nodeClass = DELETE_NODE;
+            nodeClass = NODOKA_DELETE_NODE;
             goto produceExpr;
         case NODOKA_TOKEN_VOID:
             nodeClass = NODOKA_VOID_NODE;
@@ -355,10 +426,10 @@ static nodoka_lex_class *grammar_unaryExpr(nodoka_grammar *gmr) {
             nodeClass = TYPEOF_NODE;
             goto produceExpr;
         case NODOKA_TOKEN_INC:
-            nodeClass = PRE_INC_NODE;
+            nodeClass = NODOKA_PRE_INC_NODE;
             goto produceExpr;
         case NODOKA_TOKEN_DEC:
-            nodeClass = PRE_DEC_NODE;
+            nodeClass = NODOKA_PRE_DEC_NODE;
             goto produceExpr;
         case NODOKA_TOKEN_ADD:
             nodeClass = NODOKA_POS_NODE;
@@ -380,46 +451,6 @@ produceExpr:
             return grammar_postfixExpr(gmr);
     }
 }
-
-#define BINARY_HEAD(_name, _previous) nodoka_lex_class *grammar_##_name(nodoka_grammar *gmr) {\
-        nodoka_lex_class *cur = grammar_##_previous(gmr);\
-        while (true) {\
-            uint16_t type;\
-            switch (lookahead(gmr)->type) {
-
-#define BINARY_CASE(_value) case NODOKA_TOKEN_##_value: {\
-    type = NODOKA_##_value##_NODE;\
-    break;\
-}\
- 
-#define BINARY_FOOT(_previous) default:\
-    return cur;\
-    }\
-    disposeNext(gmr);\
-    nodoka_binary_node *node = newBinaryNode(type);\
-    node->_1 = cur;\
-    node->_2 = grammar_##_previous(gmr);\
-    cur = (nodoka_lex_class *)node;\
-    }\
-    }
-
-#define BINARY_1(_name, _previous, _first) \
-    BINARY_HEAD(_name, _previous)\
-    BINARY_CASE(_first)\
-    BINARY_FOOT(_previous)
-
-#define BINARY_2(_name, _previous, _first, _second) \
-    BINARY_HEAD(_name, _previous)\
-    BINARY_CASE(_first)\
-    BINARY_CASE(_second)\
-    BINARY_FOOT(_previous)
-
-#define BINARY_3(_name, _previous, _first, _second, _third) \
-    BINARY_HEAD(_name, _previous)\
-    BINARY_CASE(_first)\
-    BINARY_CASE(_second)\
-    BINARY_CASE(_third)\
-    BINARY_FOOT(_previous)
 
 static BINARY_3(mulExpr, unaryExpr, MUL, MOD, DIV)
 static BINARY_2(addExpr, mulExpr, ADD, SUB)
@@ -499,20 +530,20 @@ static nodoka_lex_class *grammar_assignExpr(nodoka_grammar *gmr) {
 BINARY_1(expr, assignExpr, COMMA);
 
 /*
- * Statement:= Block                    LOOKAHEAD(1)=NODOKA_TOKEN_LBRACE
+ * Statement:= Block                    LOOKAHEAD(1)=LBRACE
  *           | VariableStatement        LOOKAHEAD(1)=VAR
- *           | EmptyStatement           LOOKAHEAD(1)=NODOKA_TOKEN_SEMICOLON
+ *           | EmptyStatement           LOOKAHEAD(1)=SEMICOLON
  *           | ExpressionStatement      LOOKAHEAD(1)=Blah
  *           | IfStatement              LOOKAHEAD(1)=IF
- *           | IterationStatement       LOOKAHEAD(1)=
- *           | ContinueStatement        LOOKAHEAD(1)=CONTINUE
- *           | BreakStatement           LOOKAHEAD(1)=BREAK
- *           | ReturnStatement          LOOKAHEAD(1)=RETURN
- *           | WithStatement            LOOKAHEAD(1)=WITH
- *           | LabelledStatement        LOOKAHEAD(1)=ID         LOOKAHEAD(2)=
- *           | SwitchStatement          LOOKAHEAD(1)=SWITCH
+ *           | IterationStatement       LOOKAHEAD(1)=DO WHILE FOR
+ *           | TODO ContinueStatement        LOOKAHEAD(1)=CONTINUE
+ *           | TODO BreakStatement           LOOKAHEAD(1)=BREAK
+ *           | TODO ReturnStatement          LOOKAHEAD(1)=RETURN
+ *           | TODO WithStatement            LOOKAHEAD(1)=WITH
+ *           | TODO LabelledStatement        LOOKAHEAD(1)=ID         LOOKAHEAD(2)=COLON
+ *           | TODO SwitchStatement          LOOKAHEAD(1)=SWITCH
  *           | ThrowStatement           LOOKAHEAD(1)=THROW
- *           | TryStatement             LOOKAHEAD(1)=TRY
+ *           | TODO TryStatement             LOOKAHEAD(1)=TRY
  *           | DebuggerStatement        LOOKAHEAD(1)=DEBUGGER
 */
 nodoka_lex_class *grammar_stmt(nodoka_grammar *gmr) {
@@ -526,13 +557,21 @@ nodoka_lex_class *grammar_stmt(nodoka_grammar *gmr) {
             return grammar_varStmt(gmr);
         case NODOKA_TOKEN_SEMICOLON:
             next(gmr);
-            return (nodoka_lex_class *)newEmptyNode(EMPTY_STMT);
+            return NULL;
         case NODOKA_TOKEN_IF:
             return grammar_ifStmt(gmr);
+        case NODOKA_TOKEN_DO:
+            return grammar_doWhile(gmr);
+        case NODOKA_TOKEN_WHILE:
+            return grammar_while(gmr);
+        case NODOKA_TOKEN_FOR:
+            return grammar_for(gmr);
+        case NODOKA_TOKEN_THROW:
+            return grammar_throw(gmr);
         case NODOKA_TOKEN_DEBUGGER:
             next(gmr);
             expectSemicolon(gmr);
-            return (nodoka_lex_class *)newEmptyNode(DEBUGGER_STMT);
+            return (nodoka_lex_class *)newEmptyNode(NODOKA_DEBUGGER_STMT);
         default: {
             return grammar_exprStmt(gmr);
         }
@@ -546,7 +585,7 @@ static nodoka_lex_class *grammar_block(nodoka_grammar *gmr) {
     gmr->lex->regexp = false;
     if (nxt->type == NODOKA_TOKEN_RBRACE) {
         next(gmr);
-        return (nodoka_lex_class *)newEmptyNode(EMPTY_STMT);
+        return NULL;
     }
     /* Accroding to ECMA, we should check exception
      * but I am lazy */
@@ -559,7 +598,7 @@ static nodoka_lex_class *grammar_block(nodoka_grammar *gmr) {
             next(gmr);
             return block;
         }
-        nodoka_binary_node *sb = newBinaryNode(BLOCK_STMT_LIST);
+        nodoka_binary_node *sb = newBinaryNode(NODOKA_STMT_LIST);
         sb->_1 = block;
         sb->_2 = grammar_stmt(gmr);
         block = (nodoka_lex_class *)sb;
@@ -574,7 +613,7 @@ static nodoka_lex_class *grammar_varStmt(nodoka_grammar *gmr) {
 static nodoka_lex_class *grammar_exprStmt(nodoka_grammar *gmr) {
     nodoka_lex_class *expr = grammar_expr(gmr);
 
-    nodoka_unary_node *node = newUnaryNode(EXPR_STMT);
+    nodoka_unary_node *node = newUnaryNode(NODOKA_EXPR_STMT);
     node->_1 = expr;
 
     expectSemicolon(gmr);
@@ -587,7 +626,7 @@ static nodoka_lex_class *grammar_ifStmt(nodoka_grammar *gmr) {
     nodoka_lex_class *expr = grammar_expr(gmr);
     expect(gmr, NODOKA_TOKEN_RPAREN);
     nodoka_lex_class *first = grammar_stmt(gmr);
-    nodoka_ternary_node *node = newTernaryNode(IF_STMT);
+    nodoka_ternary_node *node = newTernaryNode(NODOKA_IF_STMT);
     node->_1 = expr;
     node->_2 = first;
 
@@ -601,6 +640,92 @@ static nodoka_lex_class *grammar_ifStmt(nodoka_grammar *gmr) {
     } else {
         node->_3 = NULL;
     }
+    return (nodoka_lex_class *)node;
+}
+
+static nodoka_lex_class *grammar_doWhile(nodoka_grammar *gmr) {
+    expectAndDispose(gmr, NODOKA_TOKEN_DO);
+    nodoka_lex_class *stmt = grammar_stmt(gmr);
+    expectAndDispose(gmr, NODOKA_TOKEN_WHILE);
+    expectAndDispose(gmr, NODOKA_TOKEN_LPAREN);
+    nodoka_lex_class *expr = grammar_expr(gmr);
+    expectAndDispose(gmr, NODOKA_TOKEN_RPAREN);
+    expectSemicolon(gmr);
+
+    nodoka_binary_node *node = newBinaryNode(NODOKA_DO_STMT);
+    node->_1 = stmt;
+    node->_2 = expr;
+    return (nodoka_lex_class *)node;
+}
+
+static nodoka_lex_class *grammar_while(nodoka_grammar *gmr) {
+    expectAndDispose(gmr, NODOKA_TOKEN_WHILE);
+    expectAndDispose(gmr, NODOKA_TOKEN_LPAREN);
+    nodoka_lex_class *expr = grammar_expr(gmr);
+    expectAndDispose(gmr, NODOKA_TOKEN_RPAREN);
+    nodoka_lex_class *stmt = grammar_stmt(gmr);
+    expectSemicolon(gmr);
+    nodoka_binary_node *node = newBinaryNode(NODOKA_WHILE_STMT);
+    node->_1 = expr;
+    node->_2 = stmt;
+    return (nodoka_lex_class *)node;
+}
+
+static nodoka_lex_class *grammar_for(nodoka_grammar *gmr) {
+    expectAndDispose(gmr, NODOKA_TOKEN_FOR);
+    expectAndDispose(gmr, NODOKA_TOKEN_LPAREN);
+
+    gmr->lex->regexp = true;
+    nodoka_token *t = lookahead(gmr);
+    gmr->lex->regexp = false;
+
+    if (t->type == NODOKA_TOKEN_VAR) {
+        assert(0);
+    } else {
+        nodoka_lex_class *expr = NULL;
+        if (t->type != NODOKA_TOKEN_SEMICOLON) {
+            gmr->noIn = true;
+            expr = grammar_expr(gmr);
+            gmr->noIn = false;
+
+            if (lookahead(gmr)->type == NODOKA_TOKEN_IN) {
+                assert(!"for(expr in expr)");
+            }
+        }
+        expectAndDispose(gmr, NODOKA_TOKEN_SEMICOLON);
+        nodoka_lex_class *testExpr = NULL;
+        if (lookaheadRegexp(gmr)->type != NODOKA_TOKEN_SEMICOLON) {
+            testExpr = grammar_expr(gmr);
+        }
+        expectAndDispose(gmr, NODOKA_TOKEN_SEMICOLON);
+        nodoka_lex_class *incExpr = NULL;
+        if (lookaheadRegexp(gmr)->type != NODOKA_TOKEN_RPAREN) {
+            incExpr = grammar_expr(gmr);
+        }
+        expectAndDispose(gmr, NODOKA_TOKEN_RPAREN);
+        nodoka_lex_class *stmt = grammar_stmt(gmr);
+
+        nodoka_node_list *list = newNodeList(NODOKA_FOR_STMT, 4);
+        list->_[0] = expr;
+        list->_[1] = testExpr;
+        list->_[2] = incExpr;
+        list->_[3] = stmt;
+
+        return (nodoka_lex_class *)list;
+    }
+}
+
+static nodoka_lex_class *grammar_throw(nodoka_grammar *gmr) {
+    expectAndDispose(gmr, NODOKA_TOKEN_THROW);
+
+    nodoka_token *nxt = lookahead(gmr);
+    if (nxt->lineBefore) {
+        assert(!"Expected Expression");
+    }
+
+    nodoka_lex_class *expr = grammar_expr(gmr);
+    nodoka_node_list *node = newNodeList(NODOKA_THROW_STMT, 1);
+    node->_[0] = expr;
     return (nodoka_lex_class *)node;
 }
 

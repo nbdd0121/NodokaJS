@@ -3,6 +3,7 @@
 
 #include "js/js.h"
 #include "js/bytecode.h"
+#include "js/object.h"
 
 nodoka_data *nodoka_null;
 nodoka_data *nodoka_undefined;
@@ -46,6 +47,10 @@ nodoka_data *nodoka_new_data(enum nodoka_data_type type) {
         case NODOKA_BOOL: size = sizeof(nodoka_data); break;
         case NODOKA_NUMBER: size = sizeof(nodoka_number); break;
         case NODOKA_STRING: size = sizeof(nodoka_string); break;
+        case NODOKA_OBJECT: size = sizeof(nodoka_object); break;
+
+        case NODOKA_REFERENCE: size = sizeof(nodoka_reference); break;
+        case NODOKA_PROPERTY: size = sizeof(nodoka_prop_desc); break;
         case NODOKA_CODE: size = sizeof(nodoka_code); break;
         default: assert(0);
     }
@@ -65,3 +70,22 @@ nodoka_number *nodoka_newNumber(double val) {
     number->value = val;
     return number;
 }
+
+nodoka_reference *nodoka_newReference(nodoka_data *base, nodoka_string *name) {
+    nodoka_reference *ref = (nodoka_reference *)nodoka_new_data(NODOKA_REFERENCE);
+    ref->base = base;
+    ref->name = name;
+    return ref;
+}
+
+nodoka_prop_desc *nodoka_newPropertyDesc(void) {
+    nodoka_prop_desc *propDesc = (nodoka_prop_desc *)nodoka_new_data(NODOKA_PROPERTY);
+    propDesc->value = NULL;
+    propDesc->get = NULL;
+    propDesc->set = NULL;
+    propDesc->writable = NULL;
+    propDesc->enumerable = NULL;
+    propDesc->configurable = NULL;
+    return propDesc;
+}
+

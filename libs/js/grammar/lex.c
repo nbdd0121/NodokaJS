@@ -539,6 +539,9 @@ static void dealEscapeSequence(nodoka_lex *lex) {
         case LS:
         case PS:
             return;
+        case 'n':
+            appendToBuffer(lex, '\n');
+            return;
         default:
             assert(0);
     }

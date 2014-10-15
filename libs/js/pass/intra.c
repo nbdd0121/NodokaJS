@@ -29,6 +29,11 @@ bool nodoka_intraPcr(nodoka_code_emitter *source, nodoka_intraPcrPass pass) {
                 labelMap[offset] = 0;
                 break;
             }
+            case NODOKA_BC_RET:
+            case NODOKA_BC_THROW: {
+                labelMap[i - 1] = 0;
+                break;
+            }
             default: break;
         }
     }
@@ -49,6 +54,13 @@ bool nodoka_intraPcr(nodoka_code_emitter *source, nodoka_intraPcrPass pass) {
                 labelMap[start] = temp->bytecodeLength;
                 nodoka_emitBytecode(temp, source->bytecode[start], NULL);
                 mod |= pass(source, temp, start + 3, end);
+                break;
+            }
+            case NODOKA_BC_RET:
+            case NODOKA_BC_THROW: {
+                labelMap[start] = temp->bytecodeLength;
+                nodoka_emitBytecode(temp, source->bytecode[start]);
+                mod |= pass(source, temp, start + 1, end);
                 break;
             }
             default: {

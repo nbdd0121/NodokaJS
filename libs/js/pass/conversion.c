@@ -16,7 +16,7 @@
     }while (0)
 
 #define POP() ({\
-        uint8_t ret;\
+        enum nodoka_data_type ret;\
         if(stackTop<=typeStack){\
             ret=0xFF;\
         }else{\
@@ -26,7 +26,7 @@
     })
 
 #define PEEK() ({\
-        uint8_t ret;\
+        enum nodoka_data_type ret;\
         if(stackTop<=typeStack){\
             ret=0xFF;\
         }else{\
@@ -35,122 +35,149 @@
         ret;\
     })
 
-static bool isPrim(uint8_t x) {
+static bool isPrim(enum nodoka_data_type x) {
     return (x & (NODOKA_UNDEF | NODOKA_NULL | NODOKA_BOOL | NODOKA_NUMBER | NODOKA_STRING)) == x;
 }
 
-static bool canBeRef(uint8_t x) {
+static bool canBeRef(enum nodoka_data_type x) {
     return !!(x & NODOKA_REFERENCE);
 }
 
 bool nodoka_convPass(nodoka_code_emitter *emitter, nodoka_code_emitter *target, size_t start, size_t end) {
-    uint8_t *typeStack = malloc(128);
-    uint8_t *stackTop = typeStack;
-    uint8_t *stackLimit = typeStack + 128;
+    enum nodoka_data_type *typeStack = malloc(128);
+    enum nodoka_data_type *stackTop = typeStack;
+    enum nodoka_data_type *stackLimit = typeStack + 128;
     bool modified = false;
     for (size_t i = start; i < end;) {
         enum nodoka_bytecode bc = nodoka_pass_fetch8(emitter, &i);
         switch (bc) {
-            case NODOKA_BC_UNDEF: {
-                PUSH(NODOKA_UNDEF);
-                goto emitToTarget;
-            }
-            case NODOKA_BC_NULL: {
-                PUSH(NODOKA_NULL);
-                goto emitToTarget;
-            }
-            case NODOKA_BC_TRUE: {
-                PUSH(NODOKA_BOOL);
-                goto emitToTarget;
-            }
-            case NODOKA_BC_FALSE: {
-                PUSH(NODOKA_BOOL);
-                goto emitToTarget;
-            }
+            case NODOKA_BC_UNDEF: PUSH(NODOKA_UNDEF); break;
+            case NODOKA_BC_NULL: PUSH(NODOKA_NULL); break;
+            case NODOKA_BC_TRUE: PUSH(NODOKA_BOOL); break;
+            case NODOKA_BC_FALSE: PUSH(NODOKA_BOOL); break;
             case NODOKA_BC_LOAD_STR: {
                 uint16_t offset = nodoka_pass_fetch16(emitter, &i);
                 PUSH(NODOKA_STRING);
                 nodoka_emitBytecode(target, bc, emitter->stringPool[offset]);
-                break;
+                continue;
             }
             case NODOKA_BC_LOAD_NUM: {
                 double val = int2double(nodoka_pass_fetch64(emitter, &i));
                 PUSH(NODOKA_NUMBER);
                 nodoka_emitBytecode(target, bc, val);
-                break;
+                continue;
             }
             case NODOKA_BC_NOP: {
-                break;
+                modified = true;
+                continue;
             }
             case NODOKA_BC_DUP: {
-                uint8_t sp0 = POP();
+                enum nodoka_data_type sp0 = POP();
                 PUSH(sp0);
                 PUSH(sp0);
-                goto emitToTarget;
+                break;
             }
-            case NODOKA_BC_POP: {
-                POP();
-                goto emitToTarget;
-            }
+            case NODOKA_BC_POP: POP(); break;
             case NODOKA_BC_XCHG: {
-                uint8_t sp0 = POP();
-                uint8_t sp1 = POP();
+                enum nodoka_data_type sp0 = POP();
+                enum nodoka_data_type sp1 = POP();
                 PUSH(sp0);
                 PUSH(sp1);
-                goto emitToTarget;
+                break;
             }
-            case NODOKA_BC_RET: {
-                goto emitToTarget;
+            case NODOKA_BC_XCHG3: {
+                enum nodoka_data_type sp0 = POP();
+                enum nodoka_data_type sp1 = POP();
+                enum nodoka_data_type sp2 = POP();
+                PUSH(sp0);
+                PUSH(sp2);
+                PUSH(sp1);
+                break;
             }
+            case NODOKA_BC_RET: break;
+            case NODOKA_BC_THIS: PUSH(NODOKA_OBJECT); break;
             case NODOKA_BC_PRIM: {
-                uint8_t type = POP();
+                enum nodoka_data_type type = POP();
                 if (isPrim(type)) {
                     PUSH(type);
-                    emitter->bytecode[i - 1] = NODOKA_BC_NOP;
                     modified = true;
-                    break;
+                    continue;
                 } else {
                     PUSH(NODOKA_UNDEF | NODOKA_NULL | NODOKA_BOOL | NODOKA_NUMBER | NODOKA_STRING);
-                    goto emitToTarget;
+                    break;
                 }
             }
             case NODOKA_BC_BOOL: {
-                uint8_t type = POP();
+                enum nodoka_data_type type = POP();
                 PUSH(NODOKA_BOOL);
                 if (type == NODOKA_BOOL) {
-                    emitter->bytecode[i - 1] = NODOKA_BC_NOP;
                     modified = true;
-                    break;
+                    continue;
                 } else {
-                    goto emitToTarget;
+                    break;
                 }
             }
             case NODOKA_BC_NUM: {
-                uint8_t type = POP();
+                enum nodoka_data_type type = POP();
                 PUSH(NODOKA_NUMBER);
                 if (type == NODOKA_NUMBER) {
-                    emitter->bytecode[i - 1] = NODOKA_BC_NOP;
                     modified = true;
-                    break;
+                    continue;
                 } else {
-                    goto emitToTarget;
+                    break;
                 }
             }
-            case NODOKA_BC_GET: {
-                if (!canBeRef(PEEK())) {
-                    emitter->bytecode[i - 1] = NODOKA_BC_NOP;
+            case NODOKA_BC_STR: {
+                enum nodoka_data_type type = POP();
+                PUSH(NODOKA_STRING);
+                if (type == NODOKA_STRING) {
                     modified = true;
-                    break;
+                    continue;
                 } else {
-                    assert(0);
-                    goto emitToTarget;
+                    break;
                 }
+            }
+            case NODOKA_BC_REF: {
+                POP();
+                POP();
+                PUSH(NODOKA_REFERENCE);
+                break;
+            }
+            case NODOKA_BC_GET: {
+                enum nodoka_data_type type = POP();
+                if (!canBeRef(type)) {
+                    modified = true;
+                    PUSH(type);
+                    continue;
+                } else {
+                    PUSH(NODOKA_UNDEF | NODOKA_NULL | NODOKA_BOOL | NODOKA_NUMBER | NODOKA_STRING | NODOKA_OBJECT);
+                    break;
+                }
+            }
+            case NODOKA_BC_PUT: {
+                POP();
+                POP();
+                break;
+            }
+            case NODOKA_BC_DEL: {
+                POP();
+                PUSH(NODOKA_BOOL);
+                break;
+            }
+            case NODOKA_BC_CALL: {
+                uint8_t count = nodoka_pass_fetch8(emitter, &i);
+                nodoka_emitBytecode(target, NODOKA_BC_CALL, count);
+                for (int i = 0; i < count; i++) {
+                    POP();
+                }
+                POP();
+                PUSH(NODOKA_UNDEF | NODOKA_NULL | NODOKA_BOOL | NODOKA_NUMBER | NODOKA_STRING | NODOKA_OBJECT);
+                continue;
             }
             case NODOKA_BC_NEG:
             case NODOKA_BC_NOT:
-            case NODOKA_BC_L_NOT: {
-                goto emitToTarget;
-            }
+            case NODOKA_BC_L_NOT:
+                break;
             case NODOKA_BC_MUL:
             case NODOKA_BC_MOD:
             case NODOKA_BC_DIV:
@@ -160,15 +187,12 @@ bool nodoka_convPass(nodoka_code_emitter *emitter, nodoka_code_emitter *target, 
             case NODOKA_BC_USHR:
             case NODOKA_BC_AND:
             case NODOKA_BC_OR:
-            case NODOKA_BC_XOR: {
-                POP();
-                goto emitToTarget;
-            }
+            case NODOKA_BC_XOR: POP(); break;
             case NODOKA_BC_ADD: {
                 POP();
                 POP();
                 PUSH(NODOKA_STRING | NODOKA_NUMBER);
-                goto emitToTarget;
+                break;
             }
             case NODOKA_BC_LT:
             case NODOKA_BC_LTEQ:
@@ -177,17 +201,12 @@ bool nodoka_convPass(nodoka_code_emitter *emitter, nodoka_code_emitter *target, 
                 POP();
                 POP();
                 PUSH(NODOKA_BOOL);
-                goto emitToTarget;
-            }
-            default: {
-                assert(0);
-emitToTarget:
-                nodoka_emitBytecode(target, bc);
                 break;
             }
+            default: assert(0);
         }
+        nodoka_emitBytecode(target, bc);
     }
-ret:
     free(typeStack);
     return modified;
 }

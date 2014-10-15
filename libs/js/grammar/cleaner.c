@@ -3,6 +3,9 @@
 #include "js/lex.h"
 
 void nodoka_disposeLexNode(nodoka_lex_class *node) {
+    if (!node) {
+        return;
+    }
     switch (node->clazz) {
         case NODOKA_LEX_TOKEN: {
             nodoka_token *n = (nodoka_token *)node;
@@ -13,6 +16,10 @@ void nodoka_disposeLexNode(nodoka_lex_class *node) {
                 }
             }
             free(n);
+            break;
+        }
+        case NODOKA_LEX_EMPTY_NODE: {
+            free(node);
             break;
         }
         case NODOKA_LEX_UNARY_NODE: {
@@ -33,6 +40,14 @@ void nodoka_disposeLexNode(nodoka_lex_class *node) {
             nodoka_disposeLexNode(n->_1);
             nodoka_disposeLexNode(n->_2);
             nodoka_disposeLexNode(n->_3);
+            free(n);
+            break;
+        }
+        case NODOKA_LEX_NODE_LIST: {
+            nodoka_node_list *n = (nodoka_node_list *)node;
+            for (int i = 0; i < n->length; i++) {
+                nodoka_disposeLexNode(n->_[i]);
+            }
             free(n);
             break;
         }

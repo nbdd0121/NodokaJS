@@ -4,6 +4,10 @@
 
 #include "js/js.h"
 
+nodoka_string *nodoka_newStringFromUtf8(char *str) {
+    return nodoka_new_string(unicode_toUtf16(UTF8_STRING(str)));
+}
+
 nodoka_string *nodoka_concatString(nodoka_string *lstr, nodoka_string *rstr) {
     size_t len = lstr->value.len + rstr->value.len;
     uint16_t *str = malloc(len * sizeof(uint16_t));

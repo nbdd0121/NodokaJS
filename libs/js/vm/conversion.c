@@ -277,3 +277,10 @@ nodoka_string *nodoka_toString(nodoka_data *value) {
     }
 }
 
+nodoka_object *nodoka_toObject(nodoka_data *value) {
+    switch (value->type) {
+        case NODOKA_OBJECT: return (nodoka_object *)value;
+        default: assert(0);
+    }
+}
+

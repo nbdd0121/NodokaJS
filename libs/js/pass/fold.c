@@ -75,7 +75,17 @@ bool nodoka_foldPass(nodoka_code_emitter *emitter, nodoka_code_emitter *target, 
                 PUSH(sp1);
                 break;
             }
+            case NODOKA_BC_XCHG3: {
+                nodoka_data *sp0 = POP();
+                nodoka_data *sp1 = POP();
+                nodoka_data *sp2 = POP();
+                PUSH(sp0);
+                PUSH(sp2);
+                PUSH(sp1);
+                break;
+            }
             case NODOKA_BC_RET: break;
+            case NODOKA_BC_THIS: PUSH(NULL); break;
             /* Notice that constants are all primitives, so this instruction needs no special deal */
             case NODOKA_BC_PRIM: break;
             case NODOKA_BC_BOOL: {
@@ -105,9 +115,43 @@ bool nodoka_foldPass(nodoka_code_emitter *emitter, nodoka_code_emitter *target, 
                 }
             }
             case NODOKA_BC_STR: {
-                assert(0);
+                nodoka_data *sp0 = POP();
+                if (sp0) {
+                    nodoka_string *result = nodoka_toString(sp0);
+                    nodoka_emitBytecode(target, NODOKA_BC_POP);
+                    nodoka_emitBytecode(target, NODOKA_BC_LOAD_STR, result);
+                    PUSH((nodoka_data *)result);
+                    continue;
+                } else {
+                    PUSH(NULL);
+                    break;
+                }
             }
             case NODOKA_BC_GET: break;
+            case NODOKA_BC_PUT: POP(); POP(); break;
+            case NODOKA_BC_REF: POP(); POP(); PUSH(NULL); break;
+            case NODOKA_BC_DEL: {
+                nodoka_data *sp0 = POP();
+                if (sp0) {
+                    nodoka_emitBytecode(target, NODOKA_BC_POP);
+                    nodoka_emitBytecode(target, NODOKA_BC_TRUE);
+                    PUSH(nodoka_true);
+                    continue;
+                } else {
+                    PUSH(NULL);
+                    break;
+                }
+            }
+            case NODOKA_BC_CALL: {
+                uint8_t count = nodoka_pass_fetch8(emitter, &i);
+                nodoka_emitBytecode(target, NODOKA_BC_CALL, count);
+                for (int i = 0; i < count; i++) {
+                    POP();
+                }
+                POP();
+                PUSH(NULL);
+                continue;
+            }
             case NODOKA_BC_NEG: {
                 nodoka_number *sp0 = (nodoka_number *)POP();
                 if (sp0) {

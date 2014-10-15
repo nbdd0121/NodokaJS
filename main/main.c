@@ -11,12 +11,17 @@
 #include "js/bytecode.h"
 #include "js/lex.h"
 #include "js/pass.h"
+#include "js/object.h"
 
 int main(int argc, char **argv) {
 
     bool peehole = true;
     bool conv = true;
-    bool fold = false;
+    bool fold = true;
+
+    bool dispBytecode = false;
+
+
     char *path = NULL;
 
     for (int i = 1; i < argc; i++) {
@@ -37,6 +42,8 @@ int main(int argc, char **argv) {
                     fold = s;
                 }  else if (strcmp(name, "optimizer") == 0) {
                     peehole = conv = fold = s;
+                } else if (strcmp(name, "output-bytecode") == 0) {
+                    dispBytecode = s;
                 } else {
                     printf("NodokaJS: Unknown Option %s\n", arg);
                 }
@@ -69,18 +76,20 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    /* Syntax */
     nodoka_lex *lex = lex_new(buffer);
     free(buffer);
-
     nodoka_grammar *grammar = grammar_new(lex);
-    nodoka_lex_class *ast = grammar_expr(grammar);
+    nodoka_lex_class *ast = grammar_stmt(grammar);
 
+    /* Codegen */
     nodoka_code_emitter *emitter = nodoka_newCodeEmitter();
+    nodoka_emitBytecode(emitter, NODOKA_BC_UNDEF);
     nodoka_codegen(emitter, ast);
     nodoka_disposeLexNode(ast);
-
     nodoka_emitBytecode(emitter, NODOKA_BC_RET);
 
+    /* Optimize */
     for (int i = 0; i < 10; i++) {
         bool mod = false;
         if (conv) {
@@ -97,22 +106,45 @@ int main(int argc, char **argv) {
         }
     }
 
-
+    /* Execute */
     nodoka_code *code = nodoka_packCode(emitter);
 
-    //nodoka_storeBytecode("./bytecode.nbc", code);
+    if (dispBytecode) {
+        nodoka_printBytecode(code);
+    }
 
-    nodoka_printBytecode(code);
+    nodoka_object *global = nodoka_newGlobal();
 
-    nodoka_context *context = nodoka_newContext(code);
-    nodoka_string *ret = nodoka_toString(nodoka_exec(context));
+    nodoka_envRec *env = nodoka_newObjEnvRecord(global, NULL);
 
-    printf("return ");
-    unicode_putUtf16(ret->value);
-    printf("\n");
-
-
-
+    nodoka_context *context = nodoka_newContext(code, env, global);
+    nodoka_data *retVal;
+    enum nodoka_completion comp = nodoka_exec(context, &retVal);
+    nodoka_string *retStr = nodoka_toString(retVal);
+    switch (comp) {
+        case NODOKA_COMPLETION_RETURN: {
+            /* Result */
+            char *color = "";
+            switch (retVal->type) {
+                case NODOKA_UNDEF: color = "\033[2;37m"; break;
+                case NODOKA_NULL: color = "\033[1;39m"; break;
+                case NODOKA_NUMBER: case NODOKA_BOOL: color = "\033[0;33m"; break;
+                case NODOKA_STRING: color = "\033[0;32m"; break;
+            }
+            printf("> %s", color);
+            unicode_putUtf16(retStr->value);
+            printf("\033[0m\n");
+            break;
+        }
+        case NODOKA_COMPLETION_THROW: {
+            /* Result */
+            printf("\033[1;31mUncaught ");
+            unicode_putUtf16(retStr->value);
+            printf("\033[0m\n");
+            break;
+        }
+        default: assert(0);
+    }
 
     return 0;
 }

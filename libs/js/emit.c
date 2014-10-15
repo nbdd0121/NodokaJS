@@ -53,6 +53,12 @@ static void nodoka_emit64(nodoka_code_emitter *emitter, uint64_t val) {
 }
 
 static uint16_t nodoka_emitString(nodoka_code_emitter *emitter, nodoka_string *str) {
+    for (int i = 0; i < emitter->strPoolLength; i++) {
+        if (nodoka_sameValue((nodoka_data *)str, (nodoka_data *)emitter->stringPool[i])) {
+            return i;
+        }
+    }
+
     if (emitter->strPoolLength == emitter->strPoolCapacity) {
         emitter->strPoolCapacity += STR_POOL_CAPACITY_INC_STEP;
         emitter->stringPool = realloc(emitter->stringPool, emitter->strPoolCapacity);
@@ -79,6 +85,11 @@ void nodoka_emitBytecode(nodoka_code_emitter *emitter, uint8_t bc, ...) {
             nodoka_emit64(emitter, imm64);
             break;
         }
+        case NODOKA_BC_CALL: {
+            size_t count = va_arg(ap, size_t);
+            nodoka_emit8(emitter, count);
+            break;
+        }
         case NODOKA_BC_JMP:
         case NODOKA_BC_JT: {
             nodoka_relocatable *rel = va_arg(ap, nodoka_relocatable *);
@@ -101,8 +112,8 @@ void nodoka_relocate(nodoka_code_emitter *emitter, nodoka_relocatable rel, nodok
 }
 
 void nodoka_stripEmitter(nodoka_code_emitter *emitter) {
-    emitter->stringPool = realloc(emitter->stringPool, emitter->strPoolLength);
-    emitter->codePool = realloc(emitter->codePool, emitter->codePoolLength);
+    emitter->stringPool = realloc(emitter->stringPool, emitter->strPoolLength * sizeof(nodoka_string *));
+    emitter->codePool = realloc(emitter->codePool, emitter->codePoolLength * sizeof(nodoka_code *));
     emitter->bytecode = realloc(emitter->bytecode, emitter->bytecodeLength);
     emitter->strPoolCapacity = emitter->strPoolLength;
     emitter->codePoolCapacity = emitter->codePoolLength;

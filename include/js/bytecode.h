@@ -64,11 +64,15 @@ enum nodoka_bytecode {
      */
     NODOKA_BC_XCHG,
 
+    NODOKA_BC_XCHG3,
+
     /**
      * [] RET
      * return the top element
      */
     NODOKA_BC_RET,
+
+    NODOKA_BC_THIS,
 
     /**
      * [] PRIM
@@ -94,11 +98,19 @@ enum nodoka_bytecode {
      */
     NODOKA_BC_STR,
 
+    NODOKA_BC_REF,
+
     /**
      * [] GET
      * convert the top reference (if it is) to its value
      */
     NODOKA_BC_GET,
+
+    NODOKA_BC_PUT,
+
+    NODOKA_BC_DEL,
+
+    NODOKA_BC_CALL,
 
 
     /**
@@ -127,6 +139,10 @@ enum nodoka_bytecode {
 
     NODOKA_BC_JMP,
     NODOKA_BC_JT,
+
+    NODOKA_BC_THROW,
+
+
 };
 
 struct nodoka_code {
@@ -151,11 +167,19 @@ struct nodoka_code_emitter {
     size_t bytecodeCapacity;
 };
 
+typedef struct nodoka_envRec {
+    struct nodoka_envRec *outer;
+    nodoka_object *object;
+    nodoka_data *this;
+} nodoka_envRec;
+
 struct nodoka_context {
+    nodoka_envRec *env;
     nodoka_code *code;
     nodoka_data **stack;
     nodoka_data **stackTop;
     nodoka_data **stackLimit;
+    nodoka_object *this;
     size_t insPtr;
 };
 
@@ -170,5 +194,10 @@ void nodoka_xchgEmitter(nodoka_code_emitter *, nodoka_code_emitter *);
 void nodoka_freeEmitter(nodoka_code_emitter *emitter);
 nodoka_code *nodoka_packCode(nodoka_code_emitter *emitter);
 nodoka_code_emitter *nodoka_unpackCode(nodoka_code *code);
+
+nodoka_context *nodoka_newContext(nodoka_code *code, nodoka_envRec *env, nodoka_object *this);
+
+nodoka_envRec *nodoka_newDeclEnvRecord(nodoka_envRec *outer);
+nodoka_envRec *nodoka_newObjEnvRecord(nodoka_object *obj, nodoka_envRec *outer);
 
 #endif

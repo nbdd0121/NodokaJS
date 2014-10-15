@@ -15,7 +15,8 @@ enum nodoka_nodoka_lexype {
     NODOKA_LEX_EMPTY_NODE,
     NODOKA_LEX_UNARY_NODE,
     NODOKA_LEX_BINARY_NODE,
-    NODOKA_LEX_TERNARY_NODE
+    NODOKA_LEX_TERNARY_NODE,
+    NODOKA_LEX_NODE_LIST,
 };
 
 enum nodoka_token_type {
@@ -119,31 +120,29 @@ enum nodoka_token_type {
 };
 
 enum nodoka_empty_node_type {
-    EMPTY_STMT,
-    DEBUGGER_STMT,
+    NODOKA_DEBUGGER_STMT,
 };
 
 enum nodoka_unary_node_type {
-    POST_INC_NODE,//TODO
-    POST_DEC_NODE,//TODO
-    DELETE_NODE,//TODO
-
+    NODOKA_POST_INC_NODE,
+    NODOKA_POST_DEC_NODE,
+    NODOKA_DELETE_NODE,
     NODOKA_VOID_NODE,
 
     TYPEOF_NODE,//TODO
-    PRE_INC_NODE,//TODO
-    PRE_DEC_NODE,//TODO
-
+    NODOKA_PRE_INC_NODE,
+    NODOKA_PRE_DEC_NODE,
     NODOKA_POS_NODE,
     NODOKA_NEG_NODE,
     NODOKA_NOT_NODE,
     NODOKA_LNOT_NODE,
 
-    EXPR_STMT,
+    NODOKA_EXPR_STMT,
 };
 
 enum nodoka_binary_node_type {
-    NODOKA_MEMBER_NODE,//TODO
+    NODOKA_MEMBER_NODE,
+    NODOKA_CALL_NODE,
 
     NODOKA_MUL_NODE,
     NODOKA_MOD_NODE,
@@ -170,29 +169,37 @@ enum nodoka_binary_node_type {
     NODOKA_OR_NODE,
     NODOKA_L_AND_NODE,
     NODOKA_L_OR_NODE,
-
-    NODOKA_ASSIGN_NODE,//TODO
-    NODOKA_MUL_ASSIGN_NODE,//TODO
-    NODOKA_DIV_ASSIGN_NODE,//TODO
-    NODOKA_MOD_ASSIGN_NODE,//TODO
-    NODOKA_ADD_ASSIGN_NODE,//TODO
-    NODOKA_SUB_ASSIGN_NODE,//TODO
-    NODOKA_SHL_ASSIGN_NODE,//TODO
-    NODOKA_SHR_ASSIGN_NODE,//TODO
-    NODOKA_USHR_ASSIGN_NODE,//TODO
-    NODOKA_AND_ASSIGN_NODE,//TODO
-    NODOKA_XOR_ASSIGN_NODE,//TODO
-    NODOKA_OR_ASSIGN_NODE,//TODO
-
+    NODOKA_ASSIGN_NODE,
+    NODOKA_MUL_ASSIGN_NODE,
+    NODOKA_DIV_ASSIGN_NODE,
+    NODOKA_MOD_ASSIGN_NODE,
+    NODOKA_ADD_ASSIGN_NODE,
+    NODOKA_SUB_ASSIGN_NODE,
+    NODOKA_SHL_ASSIGN_NODE,
+    NODOKA_SHR_ASSIGN_NODE,
+    NODOKA_USHR_ASSIGN_NODE,
+    NODOKA_AND_ASSIGN_NODE,
+    NODOKA_XOR_ASSIGN_NODE,
+    NODOKA_OR_ASSIGN_NODE,
     NODOKA_COMMA_NODE,
 
-    BLOCK_STMT_LIST,
+    NODOKA_STMT_LIST,
+    NODOKA_DO_STMT,
+    NODOKA_WHILE_STMT,
+
+    NODOKA_ARG_LIST_INTERNAL
 };
 
 enum nodoka_ternary_node_type {
     NODOKA_COND_NODE,
+    NODOKA_IF_STMT,
+};
 
-    IF_STMT,
+enum nodoka_node_list_type {
+    NODOKA_ARG_LIST,
+
+    NODOKA_FOR_STMT,
+    NODOKA_THROW_STMT,
 };
 
 typedef struct nodoka_lex_class {
@@ -235,6 +242,13 @@ typedef struct nodoka_ternary_node {
     nodoka_lex_class *_2;
     nodoka_lex_class *_3;
 } nodoka_ternary_node;
+
+typedef struct nodoka_node_list {
+    nodoka_lex_class base;
+    enum nodoka_node_list_type type;
+    size_t length;
+    nodoka_lex_class *_[0];
+} nodoka_node_list;
 
 typedef struct struct_lex nodoka_lex;
 

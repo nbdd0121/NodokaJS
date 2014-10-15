@@ -17,7 +17,8 @@ enum nodoka_data_type {
 
     NODOKA_REFERENCE = 0x40,
 
-    NODOKA_CODE = 0xFF,
+    NODOKA_PROPERTY = 0x80,
+    NODOKA_CODE = 0x100,
 };
 
 typedef struct {
@@ -34,13 +35,29 @@ typedef struct {
     utf16_string_t value;
 } nodoka_string;
 
+typedef struct {
+    nodoka_data class_base;
+    nodoka_data *base;
+    nodoka_string *name;
+} nodoka_reference;
+
+typedef struct nodoka_object nodoka_object;
+typedef struct nodoka_prop_desc nodoka_prop_desc;
 typedef struct nodoka_code nodoka_code;
 typedef struct nodoka_code_emitter nodoka_code_emitter;
 typedef struct nodoka_context nodoka_context;
 
-nodoka_context *nodoka_newContext(nodoka_code *code);
-void *nodoka_exec(nodoka_context *context);
+enum nodoka_completion {
+    NODOKA_COMPLETION_NORMAL,
+    NODOKA_COMPLETION_RETURN,
+    NODOKA_COMPLETION_THROW,
+} nodoka_completion;
+
+enum nodoka_completion nodoka_exec(nodoka_context *context, nodoka_data **ret);
+
+
 int8_t nodoka_absRelComp(nodoka_data *sp1, nodoka_data *sp0);
+bool nodoka_sameValue(nodoka_data *x, nodoka_data *y);
 bool nodoka_strictEqComp(nodoka_data *x, nodoka_data *y);
 bool nodoka_absEqComp(nodoka_data *x, nodoka_data *y);
 
@@ -50,6 +67,11 @@ void nodoka_initConstant(void);
 nodoka_data *nodoka_new_data(enum nodoka_data_type type);
 nodoka_string *nodoka_new_string(utf16_string_t str);
 nodoka_number *nodoka_newNumber(double val);
+nodoka_reference *nodoka_newReference(nodoka_data *base, nodoka_string *name);
+
+
+/* string.c */
+nodoka_string *nodoka_newStringFromUtf8(char *str);
 
 /* conversion.c */
 nodoka_data *nodoka_toPrimitive(nodoka_data *value);
@@ -59,6 +81,7 @@ int32_t nodoka_toInt32(nodoka_number *value);
 uint32_t nodoka_toUint32(nodoka_number *value);
 int16_t nodoka_toInt16(nodoka_number *value);
 nodoka_string *nodoka_toString(nodoka_data *value);
+nodoka_object *nodoka_toObject(nodoka_data *value);
 
 /* vm/string.c */
 nodoka_string *nodoka_concatString(nodoka_string *lstr, nodoka_string *rstr);
