@@ -8,6 +8,7 @@
 #include "c/stdio.h"
 #include "c/assert.h"
 #include "c/stdbool.h"
+#include "c/math.h"
 
 enum {
     TAB = 0x9,
@@ -148,6 +149,10 @@ static nodoka_token *stateMultiLineComment(nodoka_lex *lex);
 static nodoka_token *stateIdentiferPart(nodoka_lex *lex);
 static nodoka_token *stateHexIntegerLiteral(nodoka_lex *lex);
 static nodoka_token *stateOctIntegerLiteral(nodoka_lex *lex);
+static nodoka_token *stateDecLiteral(nodoka_lex *lex);
+static nodoka_token *stateDecimal(nodoka_lex *lex);
+static nodoka_token *stateExpSign(nodoka_lex *lex);
+static nodoka_token *stateExpPart(nodoka_lex *lex);
 static nodoka_token *stateDoubleString(nodoka_lex *lex);
 static nodoka_token *stateSingleString(nodoka_lex *lex);
 
@@ -204,13 +209,21 @@ static nodoka_token *stateDefault(nodoka_lex *lex) {
         case '\\':
             //TODO Unicode Escape Sequence
             assert(0);
+        case '.': {
+            uint16_t nch = lex->lookahead(lex);
+            if (nch >= '0' && nch <= '9') {
+                lex->state = stateDecimal;
+                lex->data.number = 0;
+                lex->data.decimalLen = 0;
+                return NULL;
+            }
+        }
         case '{':
         case '}':
         case '(':
         case ')':
         case '[':
         case ']':
-        case '.':
         case ';':
         case ',':
         case '~':
@@ -326,7 +339,10 @@ static nodoka_token *stateDefault(nodoka_lex *lex) {
         case '7':
         case '8':
         case '9': {
-            assert(!"DEC not supported yet");
+            lex->state = stateDecLiteral;
+            lex->data.number = next - '0';
+            lex->data.decimalLen = 0;
+            return NULL;
         }
         case '"': {
             lex->state = stateDoubleString;
@@ -520,6 +536,123 @@ static nodoka_token *stateHexIntegerLiteral(nodoka_lex *lex) {
 
         nodoka_token *token = newToken(NODOKA_TOKEN_NUM);
         token->numberValue = lex->data.number;
+
+        return token;
+    }
+    return NULL;
+}
+
+static nodoka_token *stateDecLiteral(nodoka_lex *lex) {
+    uint16_t next = lex->lookahead(lex);
+    if (next >= '0' && next <= '9') {
+        lex->next(lex);
+        lex->data.number = lex->data.number * 10. + (next - '0');
+    } else if (next == '.') {
+        lex->next(lex);
+        lex->state = stateDecimal;
+        return NULL;
+    } else if (next == 'e' || next == 'E') {
+        lex->next(lex);
+        lex->state = stateExpSign;
+    } else {
+        if (next == '$' || next == '_' || next == '\\') {
+            assert(!"SyntaxError: Unexpected character after number literal.");
+        }
+        switch (unicode_getType(next)) {
+            case UPPERCASE_LETTER:
+            case LOWERCASE_LETTER:
+            case TITLECASE_LETTER:
+            case MODIFIER_LETTER:
+            case OTHER_LETTER:
+            case LETTER_NUMBER:
+                assert(!"SyntaxError: Unexpected character after number literal.");
+        }
+
+        lex->state = stateDefault;
+
+        nodoka_token *token = newToken(NODOKA_TOKEN_NUM);
+        token->numberValue = lex->data.number;
+
+        return token;
+    }
+    return NULL;
+}
+
+static nodoka_token *stateDecimal(nodoka_lex *lex) {
+    uint16_t next = lex->lookahead(lex);
+    if (next >= '0' && next <= '9') {
+        lex->next(lex);
+        lex->data.number = lex->data.number * 10. + (next - '0');
+        lex->data.decimalLen++;
+    } else if (next == 'e' || next == 'E') {
+        lex->next(lex);
+        lex->state = stateExpSign;
+    } else {
+        if (next == '$' || next == '_' || next == '\\') {
+            assert(!"SyntaxError: Unexpected character after number literal.");
+        }
+        switch (unicode_getType(next)) {
+            case UPPERCASE_LETTER:
+            case LOWERCASE_LETTER:
+            case TITLECASE_LETTER:
+            case MODIFIER_LETTER:
+            case OTHER_LETTER:
+            case LETTER_NUMBER:
+                assert(!"SyntaxError: Unexpected character after number literal.");
+        }
+
+        lex->state = stateDefault;
+
+        nodoka_token *token = newToken(NODOKA_TOKEN_NUM);
+        token->numberValue = lex->data.number * pow(10., -1.*lex->data.decimalLen);
+
+        return token;
+    }
+    return NULL;
+}
+
+static nodoka_token *stateExpSign(nodoka_lex *lex) {
+    uint16_t next = lex->lookahead(lex);
+    if (next >= '0' && next <= '9') {
+        lex->data.sign = true;
+    } else if (next == '+') {
+        lex->next(lex);
+        lex->data.sign = true;
+    } else if (next == '-') {
+        lex->next(lex);
+        lex->data.sign = false;
+    } else {
+        assert(!"SyntaxError: Expected +, - or digits after the exponential mark.");
+    }
+    lex->data.expPart = 0;
+    lex->state = stateExpPart;
+    return NULL;
+}
+
+static nodoka_token *stateExpPart(nodoka_lex *lex) {
+    uint16_t next = lex->lookahead(lex);
+    if (next >= '0' && next <= '9') {
+        lex->next(lex);
+        lex->data.expPart = lex->data.expPart * 10 + (next - '0');
+    } else {
+        if (next == '$' || next == '_' || next == '\\') {
+            assert(!"SyntaxError: Unexpected character after number literal.");
+        }
+        switch (unicode_getType(next)) {
+            case UPPERCASE_LETTER:
+            case LOWERCASE_LETTER:
+            case TITLECASE_LETTER:
+            case MODIFIER_LETTER:
+            case OTHER_LETTER:
+            case LETTER_NUMBER:
+                assert(!"SyntaxError: Unexpected character after number literal.");
+        }
+
+        lex->state = stateDefault;
+
+        nodoka_token *token = newToken(NODOKA_TOKEN_NUM);
+        int expPart = (lex->data.sign ? 1 : -1) * (int)lex->data.expPart - (int)lex->data.decimalLen;
+        token->numberValue = lex->data.number * pow(10., 1.*expPart);
 
         return token;
     }

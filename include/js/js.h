@@ -53,6 +53,16 @@ enum nodoka_completion {
     NODOKA_COMPLETION_THROW,
 } nodoka_completion;
 
+typedef struct nodoka_global {
+    nodoka_object *global;
+    nodoka_object *object;
+    nodoka_object *Object_prototype;
+    nodoka_object *function;
+    nodoka_object *Function_prototype;
+    nodoka_object *Array;
+    nodoka_object *Array_prototype;
+} nodoka_global;
+
 enum nodoka_completion nodoka_exec(nodoka_context *context, nodoka_data **ret);
 
 
@@ -64,6 +74,8 @@ bool nodoka_absEqComp(nodoka_data *x, nodoka_data *y);
 void nodoka_printBytecode(nodoka_code *);
 
 void nodoka_initConstant(void);
+void nodoka_initStringPool(void);
+
 nodoka_data *nodoka_new_data(enum nodoka_data_type type);
 nodoka_string *nodoka_new_string(utf16_string_t str);
 nodoka_number *nodoka_newNumber(double val);
@@ -74,13 +86,15 @@ nodoka_reference *nodoka_newReference(nodoka_data *base, nodoka_string *name);
 nodoka_string *nodoka_newStringFromUtf8(char *str);
 
 /* conversion.c */
+nodoka_string *nodoka_newStringFromDouble(double value);
+
 nodoka_data *nodoka_toPrimitive(nodoka_data *value);
 nodoka_data *nodoka_toBoolean(nodoka_data *value);
 nodoka_number *nodoka_toNumber(nodoka_data *value);
 int32_t nodoka_toInt32(nodoka_number *value);
 uint32_t nodoka_toUint32(nodoka_number *value);
 int16_t nodoka_toInt16(nodoka_number *value);
-nodoka_string *nodoka_toString(nodoka_data *value);
+nodoka_string *nodoka_toString(nodoka_global *G, nodoka_data *value);
 nodoka_object *nodoka_toObject(nodoka_data *value);
 
 /* vm/string.c */
@@ -89,6 +103,9 @@ nodoka_string *nodoka_concatString(nodoka_string *lstr, nodoka_string *rstr);
 /* bcloader.c */
 char *nodoka_readFile(char *path, size_t *sizePtr);
 nodoka_code *nodoka_loadBytecode(char *path);
+
+int nodoka_compareString(void *a, void *b);
+int nodoka_hashString(void *a);
 
 extern nodoka_data *nodoka_null;
 extern nodoka_data *nodoka_undefined;

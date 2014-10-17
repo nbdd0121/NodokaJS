@@ -40,6 +40,8 @@ enum nodoka_bytecode {
      */
     NODOKA_BC_LOAD_NUM,
 
+    NODOKA_BC_LOAD_OBJ,
+
     /**
      * [] NOP
      * do nothing
@@ -100,6 +102,8 @@ enum nodoka_bytecode {
 
     NODOKA_BC_REF,
 
+    NODOKA_BC_ID,
+
     /**
      * [] GET
      * convert the top reference (if it is) to its value
@@ -112,6 +116,9 @@ enum nodoka_bytecode {
 
     NODOKA_BC_CALL,
 
+    NODOKA_BC_NEW,
+
+    NODOKA_BC_TYPEOF,
 
     /**
      * [] NEG
@@ -142,8 +149,10 @@ enum nodoka_bytecode {
 
     NODOKA_BC_THROW,
 
-
+    NODOKA_BC_PROTECTOR,
 };
+
+extern void *bytecode_protector[NODOKA_BC_PROTECTOR > 0xFF ? -1 : 1];
 
 struct nodoka_code {
     nodoka_data base;
@@ -174,6 +183,7 @@ typedef struct nodoka_envRec {
 } nodoka_envRec;
 
 struct nodoka_context {
+    nodoka_global *global;
     nodoka_envRec *env;
     nodoka_code *code;
     nodoka_data **stack;
@@ -195,9 +205,14 @@ void nodoka_freeEmitter(nodoka_code_emitter *emitter);
 nodoka_code *nodoka_packCode(nodoka_code_emitter *emitter);
 nodoka_code_emitter *nodoka_unpackCode(nodoka_code *code);
 
-nodoka_context *nodoka_newContext(nodoka_code *code, nodoka_envRec *env, nodoka_object *this);
+nodoka_context *nodoka_newContext(nodoka_global *global, nodoka_envRec *env, nodoka_code *code, nodoka_object *this);
 
 nodoka_envRec *nodoka_newDeclEnvRecord(nodoka_envRec *outer);
 nodoka_envRec *nodoka_newObjEnvRecord(nodoka_object *obj, nodoka_envRec *outer);
+bool nodoka_hasBinding(nodoka_envRec *env, nodoka_string *name);
+nodoka_data *nodoka_getBindingValue(nodoka_envRec *env, nodoka_string *name);
+void nodoka_setMutableBinding(nodoka_envRec *env, nodoka_string *name, nodoka_data *val);
+
+nodoka_object *nodoka_newObject(nodoka_global *global);
 
 #endif

@@ -54,7 +54,7 @@ static void nodoka_emit64(nodoka_code_emitter *emitter, uint64_t val) {
 
 static uint16_t nodoka_emitString(nodoka_code_emitter *emitter, nodoka_string *str) {
     for (int i = 0; i < emitter->strPoolLength; i++) {
-        if (nodoka_sameValue((nodoka_data *)str, (nodoka_data *)emitter->stringPool[i])) {
+        if (str == emitter->stringPool[i]) {
             return i;
         }
     }
@@ -85,7 +85,8 @@ void nodoka_emitBytecode(nodoka_code_emitter *emitter, uint8_t bc, ...) {
             nodoka_emit64(emitter, imm64);
             break;
         }
-        case NODOKA_BC_CALL: {
+        case NODOKA_BC_CALL:
+        case NODOKA_BC_NEW: {
             size_t count = va_arg(ap, size_t);
             nodoka_emit8(emitter, count);
             break;

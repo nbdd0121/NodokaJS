@@ -60,6 +60,10 @@ bool nodoka_foldPass(nodoka_code_emitter *emitter, nodoka_code_emitter *target, 
                 nodoka_emitBytecode(target, bc, val);
                 continue;
             }
+            case NODOKA_BC_LOAD_OBJ: {
+                PUSH(NULL);
+                break;
+            }
             case NODOKA_BC_NOP: continue;
             case NODOKA_BC_DUP: {
                 nodoka_data *sp0 = POP();
@@ -117,7 +121,7 @@ bool nodoka_foldPass(nodoka_code_emitter *emitter, nodoka_code_emitter *target, 
             case NODOKA_BC_STR: {
                 nodoka_data *sp0 = POP();
                 if (sp0) {
-                    nodoka_string *result = nodoka_toString(sp0);
+                    nodoka_string *result = nodoka_toString(NULL, sp0);
                     nodoka_emitBytecode(target, NODOKA_BC_POP);
                     nodoka_emitBytecode(target, NODOKA_BC_LOAD_STR, result);
                     PUSH((nodoka_data *)result);
@@ -130,6 +134,7 @@ bool nodoka_foldPass(nodoka_code_emitter *emitter, nodoka_code_emitter *target, 
             case NODOKA_BC_GET: break;
             case NODOKA_BC_PUT: POP(); POP(); break;
             case NODOKA_BC_REF: POP(); POP(); PUSH(NULL); break;
+            case NODOKA_BC_ID: POP(); PUSH(NULL); break;
             case NODOKA_BC_DEL: {
                 nodoka_data *sp0 = POP();
                 if (sp0) {
@@ -142,15 +147,21 @@ bool nodoka_foldPass(nodoka_code_emitter *emitter, nodoka_code_emitter *target, 
                     break;
                 }
             }
-            case NODOKA_BC_CALL: {
+            case NODOKA_BC_CALL:
+            case NODOKA_BC_NEW: {
                 uint8_t count = nodoka_pass_fetch8(emitter, &i);
-                nodoka_emitBytecode(target, NODOKA_BC_CALL, count);
+                nodoka_emitBytecode(target, bc, count);
                 for (int i = 0; i < count; i++) {
                     POP();
                 }
                 POP();
                 PUSH(NULL);
                 continue;
+            }
+            case NODOKA_BC_TYPEOF: {
+                POP();
+                PUSH(NULL);
+                break;
             }
             case NODOKA_BC_NEG: {
                 nodoka_number *sp0 = (nodoka_number *)POP();
@@ -240,8 +251,8 @@ bool nodoka_foldPass(nodoka_code_emitter *emitter, nodoka_code_emitter *target, 
                     nodoka_emitBytecode(target, NODOKA_BC_POP);
                     nodoka_emitBytecode(target, NODOKA_BC_POP);
                     if (sp1->type == NODOKA_STRING || sp0->type == NODOKA_STRING) {
-                        nodoka_string *lstr = nodoka_toString(sp1);
-                        nodoka_string *rstr = nodoka_toString(sp0);
+                        nodoka_string *lstr = nodoka_toString(NULL, sp1);
+                        nodoka_string *rstr = nodoka_toString(NULL, sp0);
                         nodoka_string *result = nodoka_concatString(lstr, rstr);
                         PUSH((nodoka_data *)result);
                         nodoka_emitBytecode(target, NODOKA_BC_LOAD_STR, result);

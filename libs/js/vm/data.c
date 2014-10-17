@@ -29,14 +29,15 @@ void nodoka_initConstant(void) {
     nodoka_nan = nodoka_newNumber(0.0 / 0.0);
     nodoka_zero = nodoka_newNumber(0);
     nodoka_one = nodoka_newNumber(1);
-    nodoka_nullStr = nodoka_new_string(unicode_toUtf16(UTF8_STRING("null")));
-    nodoka_undefStr = nodoka_new_string(unicode_toUtf16(UTF8_STRING("undefined")));
-    nodoka_trueStr = nodoka_new_string(unicode_toUtf16(UTF8_STRING("true")));
-    nodoka_falseStr = nodoka_new_string(unicode_toUtf16(UTF8_STRING("false")));
-    nodoka_nanStr = nodoka_new_string(unicode_toUtf16(UTF8_STRING("NaN")));
-    nodoka_infStr = nodoka_new_string(unicode_toUtf16(UTF8_STRING("Infinity")));
-    nodoka_negInfStr = nodoka_new_string(unicode_toUtf16(UTF8_STRING("-Infinity")));
-    nodoka_zeroStr = nodoka_new_string(unicode_toUtf16(UTF8_STRING("0")));
+    nodoka_initStringPool();
+    nodoka_nullStr = nodoka_newStringFromUtf8("null");
+    nodoka_undefStr = nodoka_newStringFromUtf8("undefined");
+    nodoka_trueStr = nodoka_newStringFromUtf8("true");
+    nodoka_falseStr = nodoka_newStringFromUtf8("false");
+    nodoka_nanStr = nodoka_newStringFromUtf8("NaN");
+    nodoka_infStr = nodoka_newStringFromUtf8("Infinity");
+    nodoka_negInfStr = nodoka_newStringFromUtf8("-Infinity");
+    nodoka_zeroStr = nodoka_newStringFromUtf8("0");
 }
 
 nodoka_data *nodoka_new_data(enum nodoka_data_type type) {
@@ -57,12 +58,6 @@ nodoka_data *nodoka_new_data(enum nodoka_data_type type) {
     nodoka_data *data = malloc(size);
     data->type = type;
     return data;
-}
-
-nodoka_string *nodoka_new_string(utf16_string_t str) {
-    nodoka_string *string = (nodoka_string *)nodoka_new_data(NODOKA_STRING);
-    string->value = str;
-    return string;
 }
 
 nodoka_number *nodoka_newNumber(double val) {

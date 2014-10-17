@@ -129,7 +129,7 @@ enum nodoka_unary_node_type {
     NODOKA_DELETE_NODE,
     NODOKA_VOID_NODE,
 
-    TYPEOF_NODE,//TODO
+    NODOKA_TYPEOF_NODE,//TODO
     NODOKA_PRE_INC_NODE,
     NODOKA_PRE_DEC_NODE,
     NODOKA_POS_NODE,
@@ -183,7 +183,6 @@ enum nodoka_binary_node_type {
     NODOKA_OR_ASSIGN_NODE,
     NODOKA_COMMA_NODE,
 
-    NODOKA_STMT_LIST,
     NODOKA_DO_STMT,
     NODOKA_WHILE_STMT,
 
@@ -196,10 +195,25 @@ enum nodoka_ternary_node_type {
 };
 
 enum nodoka_node_list_type {
-    NODOKA_ARG_LIST,
-
-    NODOKA_FOR_STMT,
+    /* Unary */
     NODOKA_THROW_STMT,
+
+    /* Binary */
+    NODOKA_OBJ_LIT_VAL,
+    NODOKA_NEW_NODE,
+    NODOKA_STMT_LIST,
+
+    NODOKA_INTERNAL_LIST,
+
+    /* Ternary */
+    NODOKA_FUNCTION_NODE,
+
+    /* Quaternary */
+    NODOKA_FOR_STMT,
+
+    /* Var-length */
+    NODOKA_OBJ_LIT,
+    NODOKA_ARG_LIST,
 };
 
 typedef struct nodoka_lex_class {
@@ -268,7 +282,12 @@ struct struct_lex {
             size_t size;
             size_t length;
         };
-        double number;
+        struct {
+            double number;
+            uint16_t decimalLen;
+            uint16_t expPart;
+            bool sign;
+        };
     } data;
 };
 

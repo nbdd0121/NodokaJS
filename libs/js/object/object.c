@@ -1,8 +1,8 @@
 #include "c/assert.h"
 
 #include "js/object.h"
-
 #include "unicode/hash.h"
+
 
 int nodoka_compareString(void *a, void *b) {
     nodoka_string *x = a;
@@ -23,14 +23,17 @@ static nodoka_prop_desc *getOwnProperty(nodoka_object *O, nodoka_string *P) {
     return desc;
 }
 
-nodoka_object *nodoka_newObject(void) {
+nodoka_object *nodoka_newNativeObject(void) {
     nodoka_object *obj = (nodoka_object *)nodoka_new_data(NODOKA_OBJECT);
     obj->prop = hashmap_new(nodoka_hashString, nodoka_compareString, 11);
     obj->prototype = NULL;
+    obj->_class = NULL;
     obj->extensible = true;
     obj->getOwnProperty = getOwnProperty;
     obj->call = NULL;
     obj->construct = NULL;
+    obj->code = NULL;
+    obj->codeString = NULL;
     return obj;
 }
 
@@ -43,7 +46,7 @@ nodoka_prop_desc *nodoka_getProperty(nodoka_object *O, nodoka_string *P) {
     if (prop) {
         return prop;
     }
-    if (O->prototype == NULL) {
+    if (!O->prototype) {
         return NULL;
     }
     return nodoka_getProperty(O->prototype, P);
@@ -119,7 +122,9 @@ void nodoka_put(nodoka_object *O, nodoka_string *P, nodoka_data *V, bool throw) 
     }
 }
 
-bool nodoka_hasOwnProperty(nodoka_object *O, nodoka_string *P);
+bool nodoka_hasProperty(nodoka_object *O, nodoka_string *P) {
+    return !!nodoka_getProperty(O, P);
+}
 
 bool nodoka_delete(nodoka_object *O, nodoka_string *P, bool throw) {
     nodoka_prop_desc *desc = nodoka_getOwnProperty(O, P);
@@ -136,7 +141,21 @@ bool nodoka_delete(nodoka_object *O, nodoka_string *P, bool throw) {
     return false;
 }
 
-nodoka_data *nodoka_defaultValue(nodoka_object *O, enum nodoka_data_type hint);
+nodoka_data *nodoka_defaultValue(nodoka_global *G, nodoka_object *O, enum nodoka_data_type hint) {
+    if (hint == NODOKA_STRING) {
+        nodoka_object *toString = (nodoka_object *)nodoka_get(O, nodoka_newStringFromUtf8("toString"));
+        if (toString->base.type == NODOKA_OBJECT && toString->call) {
+            nodoka_data *ret;
+            nodoka_call(G, toString, (nodoka_data *)O, &ret, 0, NULL);
+            if (ret->type != NODOKA_OBJECT) {
+                return ret;
+            }
+        }
+        assert(0);
+    } else {
+        assert(0);
+    }
+}
 
 bool nodoka_defineOwnProperty(nodoka_object *O, nodoka_string *P, nodoka_prop_desc *desc, bool throw) {
     nodoka_prop_desc *current = nodoka_getOwnProperty(O, P);

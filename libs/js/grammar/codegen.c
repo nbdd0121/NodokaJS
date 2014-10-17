@@ -11,6 +11,12 @@ static void commonCodegen(nodoka_code_emitter *emitter, nodoka_node_list *node) 
 
 static void codegenToken(nodoka_code_emitter *emitter, nodoka_token *node) {
     switch (node->type) {
+        case NODOKA_TOKEN_ID: {
+            nodoka_emitBytecode(emitter, NODOKA_BC_LOAD_STR, nodoka_new_string(node->stringValue));
+            nodoka_emitBytecode(emitter, NODOKA_BC_ID);
+            node->stringValue.str = NULL;
+            break;
+        }
         case NODOKA_TOKEN_STR: {
             nodoka_emitBytecode(emitter, NODOKA_BC_LOAD_STR, nodoka_new_string(node->stringValue));
             node->stringValue.str = NULL;
@@ -49,6 +55,11 @@ static void codegenUnary(nodoka_code_emitter *emitter, nodoka_unary_node *node) 
         case NODOKA_DELETE_NODE: {
             nodoka_codegen(emitter, node->_1);
             nodoka_emitBytecode(emitter, NODOKA_BC_DEL);
+            break;
+        }
+        case NODOKA_TYPEOF_NODE: {
+            commonUnary(emitter, node);
+            nodoka_emitBytecode(emitter, NODOKA_BC_TYPEOF);
             break;
         }
         case NODOKA_VOID_NODE: {
@@ -173,10 +184,7 @@ static void codegenBinary(nodoka_code_emitter *emitter, nodoka_binary_node *node
             nodoka_node_list *list = (nodoka_node_list *)node->_2;
             size_t count;
             if (list) {
-                for (int i = 0; i < list->length; i++) {
-                    nodoka_codegen(emitter, list->_[i]);
-                    nodoka_emitBytecode(emitter, NODOKA_BC_GET);
-                }
+                commonCodegen(emitter, list);
                 count = list->length;
             } else {
                 count = 0;
@@ -410,11 +418,6 @@ static void codegenBinary(nodoka_code_emitter *emitter, nodoka_binary_node *node
             break;
         }
 
-        case NODOKA_STMT_LIST: {
-            nodoka_codegen(emitter, node->_1);
-            nodoka_codegen(emitter, node->_2);
-            break;
-        }
         case NODOKA_DO_STMT: {
             nodoka_label bodyLabel = nodoka_putLabel(emitter);
             nodoka_codegen(emitter, node->_1);
@@ -508,6 +511,41 @@ void codegenTernary(nodoka_code_emitter *emitter, nodoka_ternary_node *node) {
 
 void codegen(nodoka_code_emitter *emitter, nodoka_node_list *node) {
     switch (node->type) {
+        case NODOKA_THROW_STMT: {
+            nodoka_emitBytecode(emitter, NODOKA_BC_POP);
+            commonCodegen(emitter, node);
+            nodoka_emitBytecode(emitter, NODOKA_BC_THROW);
+            break;
+        }
+        case NODOKA_OBJ_LIT_VAL: {
+            nodoka_emitBytecode(emitter, NODOKA_BC_DUP);
+            nodoka_codegen(emitter, node->_[0]);
+            nodoka_emitBytecode(emitter, NODOKA_BC_REF);
+            nodoka_codegen(emitter, node->_[1]);
+            nodoka_emitBytecode(emitter, NODOKA_BC_GET);
+            nodoka_emitBytecode(emitter, NODOKA_BC_PUT);
+            break;
+        }
+        case NODOKA_NEW_NODE: {
+            nodoka_codegen(emitter, node->_[0]);
+            nodoka_emitBytecode(emitter, NODOKA_BC_GET);
+            nodoka_node_list *list = (nodoka_node_list *)node->_[1];
+            size_t count;
+            if (list) {
+                commonCodegen(emitter, list);
+                count = list->length;
+            } else {
+                count = 0;
+            }
+            nodoka_emitBytecode(emitter, NODOKA_BC_NEW, count);
+            break;
+        }
+        case NODOKA_STMT_LIST: {
+            for (int i = 0; i < node->length; i++) {
+                nodoka_codegen(emitter, node->_[i]);
+            }
+            break;
+        }
         case NODOKA_FOR_STMT: {
             nodoka_relocatable rel, rel2;
             if (node->_[0]) {
@@ -537,10 +575,12 @@ void codegen(nodoka_code_emitter *emitter, nodoka_node_list *node) {
             nodoka_relocate(emitter, rel2, checkpoint);
             break;
         }
-        case NODOKA_THROW_STMT: {
-            nodoka_emitBytecode(emitter, NODOKA_BC_POP);
-            commonCodegen(emitter, node);
-            nodoka_emitBytecode(emitter, NODOKA_BC_THROW);
+        case NODOKA_OBJ_LIT: {
+            nodoka_emitBytecode(emitter, NODOKA_BC_LOAD_OBJ);
+            nodoka_emitBytecode(emitter, NODOKA_BC_NEW, 0);
+            for (int i = 0; i < node->length; i++) {
+                nodoka_codegen(emitter, node->_[i]);
+            }
             break;
         }
         default: assert(0);

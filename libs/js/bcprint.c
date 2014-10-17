@@ -61,6 +61,10 @@ void nodoka_printBytecode(nodoka_code *codeseg) {
                 printf("CALL %d", fetchByte(codeseg, &i));
                 break;
             }
+            case NODOKA_BC_NEW: {
+                printf("NEW %d", fetchByte(codeseg, &i));
+                break;
+            }
             case NODOKA_BC_JT: {
                 printf("JT %d", fetch16(codeseg, &i));
                 break;
@@ -73,6 +77,7 @@ void nodoka_printBytecode(nodoka_code *codeseg) {
             DECL_OP(NULL);
             DECL_OP(TRUE);
             DECL_OP(FALSE);
+            DECL_OP(LOAD_OBJ);
             DECL_OP(NOP);
             DECL_OP(DUP);
             DECL_OP(POP);
@@ -83,9 +88,11 @@ void nodoka_printBytecode(nodoka_code *codeseg) {
             DECL_OP(NUM);
             DECL_OP(STR);
             DECL_OP(REF);
+            DECL_OP(ID);
             DECL_OP(GET);
             DECL_OP(PUT);
             DECL_OP(DEL);
+            DECL_OP(TYPEOF);
             DECL_OP(NEG);
             DECL_OP(NOT);
             DECL_OP(L_NOT);

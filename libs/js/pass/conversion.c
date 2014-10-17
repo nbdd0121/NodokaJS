@@ -67,6 +67,10 @@ bool nodoka_convPass(nodoka_code_emitter *emitter, nodoka_code_emitter *target, 
                 nodoka_emitBytecode(target, bc, val);
                 continue;
             }
+            case NODOKA_BC_LOAD_OBJ: {
+                PUSH(NODOKA_OBJECT);
+                break;
+            }
             case NODOKA_BC_NOP: {
                 modified = true;
                 continue;
@@ -143,6 +147,11 @@ bool nodoka_convPass(nodoka_code_emitter *emitter, nodoka_code_emitter *target, 
                 PUSH(NODOKA_REFERENCE);
                 break;
             }
+            case NODOKA_BC_ID: {
+                POP();
+                PUSH(NODOKA_REFERENCE);
+                break;
+            }
             case NODOKA_BC_GET: {
                 enum nodoka_data_type type = POP();
                 if (!canBeRef(type)) {
@@ -173,6 +182,43 @@ bool nodoka_convPass(nodoka_code_emitter *emitter, nodoka_code_emitter *target, 
                 POP();
                 PUSH(NODOKA_UNDEF | NODOKA_NULL | NODOKA_BOOL | NODOKA_NUMBER | NODOKA_STRING | NODOKA_OBJECT);
                 continue;
+            }
+            case NODOKA_BC_NEW: {
+                uint8_t count = nodoka_pass_fetch8(emitter, &i);
+                nodoka_emitBytecode(target, NODOKA_BC_NEW, count);
+                for (int i = 0; i < count; i++) {
+                    POP();
+                }
+                POP();
+                PUSH(NODOKA_OBJECT);
+                continue;
+            }
+            case NODOKA_BC_TYPEOF: {
+                enum nodoka_data_type type = POP();
+                if (type == NODOKA_UNDEF) {
+                    nodoka_emitBytecode(target, NODOKA_BC_POP);
+                    nodoka_emitBytecode(target, NODOKA_BC_LOAD_STR, nodoka_newStringFromUtf8("undefined"));
+                    continue;
+                } else if (type == NODOKA_NULL) {
+                    nodoka_emitBytecode(target, NODOKA_BC_POP);
+                    nodoka_emitBytecode(target, NODOKA_BC_LOAD_STR, nodoka_newStringFromUtf8("object"));
+                    continue;
+                } else if (type == NODOKA_BOOL) {
+                    nodoka_emitBytecode(target, NODOKA_BC_POP);
+                    nodoka_emitBytecode(target, NODOKA_BC_LOAD_STR, nodoka_newStringFromUtf8("boolean"));
+                    continue;
+                } else if (type == NODOKA_NUMBER) {
+                    nodoka_emitBytecode(target, NODOKA_BC_POP);
+                    nodoka_emitBytecode(target, NODOKA_BC_LOAD_STR, nodoka_newStringFromUtf8("number"));
+                    continue;
+                } else if (type == NODOKA_STRING) {
+                    nodoka_emitBytecode(target, NODOKA_BC_POP);
+                    nodoka_emitBytecode(target, NODOKA_BC_LOAD_STR, nodoka_newStringFromUtf8("string"));
+                    continue;
+                } else {
+                    PUSH(NODOKA_STRING);
+                }
+                break;
             }
             case NODOKA_BC_NEG:
             case NODOKA_BC_NOT:
