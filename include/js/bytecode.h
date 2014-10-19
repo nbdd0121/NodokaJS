@@ -40,7 +40,10 @@ enum nodoka_bytecode {
      */
     NODOKA_BC_LOAD_NUM,
 
+    NODOKA_BC_FUNC,
+
     NODOKA_BC_LOAD_OBJ,
+    NODOKA_BC_LOAD_ARR,
 
     /**
      * [] NOP
@@ -146,8 +149,13 @@ enum nodoka_bytecode {
 
     NODOKA_BC_JMP,
     NODOKA_BC_JT,
+    NODOKA_BC_TRY,
+    NODOKA_BC_CATCH,
+    NODOKA_BC_NOCATCH,
 
     NODOKA_BC_THROW,
+
+    NODOKA_BC_DECL,
 
     NODOKA_BC_PROTECTOR,
 };
@@ -162,6 +170,11 @@ struct nodoka_code {
     size_t strPoolLength;
     size_t codePoolLength;
     size_t bytecodeLength;
+    struct {
+        size_t length;
+        nodoka_string **array;
+    } formalParameters;
+    nodoka_string *name;
 };
 
 struct nodoka_code_emitter {
@@ -176,11 +189,12 @@ struct nodoka_code_emitter {
     size_t bytecodeCapacity;
 };
 
-typedef struct nodoka_envRec {
+struct nodoka_envRec {
+    nodoka_data base;
     struct nodoka_envRec *outer;
     nodoka_object *object;
     nodoka_data *this;
-} nodoka_envRec;
+};
 
 struct nodoka_context {
     nodoka_global *global;
@@ -191,6 +205,7 @@ struct nodoka_context {
     nodoka_data **stackLimit;
     nodoka_object *this;
     size_t insPtr;
+    size_t catchPtr;
 };
 
 typedef uint16_t nodoka_relocatable;
@@ -214,5 +229,7 @@ nodoka_data *nodoka_getBindingValue(nodoka_envRec *env, nodoka_string *name);
 void nodoka_setMutableBinding(nodoka_envRec *env, nodoka_string *name, nodoka_data *val);
 
 nodoka_object *nodoka_newObject(nodoka_global *global);
+
+nodoka_object *nodoka_newFunction(nodoka_context *context, nodoka_code *code);
 
 #endif

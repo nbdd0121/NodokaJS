@@ -5,25 +5,25 @@
 #include "js/builtin.h"
 #include "js/object.h"
 
-static enum nodoka_completion print_native(nodoka_global *global, nodoka_object *func, nodoka_data *this, nodoka_data **ret, int argc, nodoka_data **argv) {
+static enum nodoka_completion print_native(nodoka_context *C, nodoka_object *func, nodoka_data *this, nodoka_data **ret, int argc, nodoka_data **argv) {
     for (int i = 0; i < argc; i++) {
-        nodoka_string *str = nodoka_toString(global, argv[i]);
+        nodoka_string *str = nodoka_toString(C, argv[i]);
         unicode_putUtf16(str->value);
     }
     *ret = nodoka_undefined;
     return NODOKA_COMPLETION_RETURN;
 }
 
-enum nodoka_completion nodoka_colorDir(nodoka_global *global, nodoka_object *func, nodoka_data *this, nodoka_data **ret, int argc, nodoka_data **argv) {
+enum nodoka_completion nodoka_colorDir(nodoka_context *C, nodoka_object *func, nodoka_data *this, nodoka_data **ret, int argc, nodoka_data **argv) {
     for (int i = 0; i < argc; i++) {
         nodoka_data *data = argv[i];
         switch (data->type) {
             case NODOKA_UNDEF: printf("\033[2;37mundefined"); break;
             case NODOKA_NULL: printf("\033[1;39mnull"); break;
             case NODOKA_NUMBER:
-            case NODOKA_BOOL: printf("\033[0;33m"); unicode_putUtf16(nodoka_toString(global, data)->value); break;
+            case NODOKA_BOOL: printf("\033[0;33m"); unicode_putUtf16(nodoka_toString(C, data)->value); break;
             case NODOKA_STRING: printf("\033[0;32m'"); unicode_putUtf16(((nodoka_string *)data)->value); printf("'"); break;
-            case NODOKA_OBJECT: unicode_putUtf16(nodoka_toString(global, data)->value); break;
+            case NODOKA_OBJECT: unicode_putUtf16(nodoka_toString(C, data)->value); break;
             default: assert(0);
         }
         printf("\033[0m ");
@@ -48,7 +48,7 @@ static uint32_t get6Bits(uint16_t cha) {
     }
 }
 
-static enum nodoka_completion base64_decodeNative(nodoka_global *global, nodoka_object *func, nodoka_data *this, nodoka_data **ret, int argc, nodoka_data **argv) {
+static enum nodoka_completion base64_decodeNative(nodoka_context *C, nodoka_object *func, nodoka_data *this, nodoka_data **ret, int argc, nodoka_data **argv) {
     if (argc != 1 || argv[0]->type != NODOKA_STRING) {
         *ret = (nodoka_data *)nodoka_newStringFromUtf8("TypeError: Illegal Signature");
         return NODOKA_COMPLETION_THROW;
@@ -96,7 +96,7 @@ static enum nodoka_completion base64_decodeNative(nodoka_global *global, nodoka_
     return NODOKA_COMPLETION_RETURN;
 }
 
-enum nodoka_completion memoryAddress(nodoka_global *global, nodoka_object *func, nodoka_data *this, nodoka_data **ret, int argc, nodoka_data **argv) {
+enum nodoka_completion memoryAddress(nodoka_context *C, nodoka_object *func, nodoka_data *this, nodoka_data **ret, int argc, nodoka_data **argv) {
     if (argc == 0) {
         *ret = (nodoka_data *)nodoka_newStringFromUtf8("TypeError: Expected argument for __nodoka__.memoryAddress");
         return NODOKA_COMPLETION_THROW;

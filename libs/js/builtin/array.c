@@ -12,7 +12,7 @@ nodoka_object *nodoka_newArray(nodoka_global *global, uint32_t length) {
     return obj;
 }
 
-static enum nodoka_completion Array_construct(nodoka_global *global, nodoka_object *func, nodoka_data **ret, int argc, nodoka_data **argv) {
+static enum nodoka_completion Array_construct(nodoka_context *C, nodoka_object *func, nodoka_data **ret, int argc, nodoka_data **argv) {
     if (argc == 1 && argv[0]->type == NODOKA_NUMBER) {
         nodoka_number *num = (nodoka_number *)argv[0];
         uint32_t len = nodoka_toUint32(num);
@@ -20,10 +20,10 @@ static enum nodoka_completion Array_construct(nodoka_global *global, nodoka_obje
             *ret = (nodoka_data *)nodoka_newStringFromUtf8("RangeError: Invalid array length");
             return NODOKA_COMPLETION_THROW;
         }
-        *ret = (nodoka_data *)nodoka_newArray(global, len);
+        *ret = (nodoka_data *)nodoka_newArray(C->global, len);
         return NODOKA_COMPLETION_RETURN;
     }
-    nodoka_object *array = nodoka_newArray(global, argc);
+    nodoka_object *array = nodoka_newArray(C->global, argc);
     for (int i = 0; i < argc; i++) {
         nodoka_defineOwnProperty(array,
                                  nodoka_newStringFromDouble(i),
@@ -34,8 +34,8 @@ static enum nodoka_completion Array_construct(nodoka_global *global, nodoka_obje
     return NODOKA_COMPLETION_RETURN;
 }
 
-static enum nodoka_completion Array_native(nodoka_global *global, nodoka_object *func, nodoka_data *this, nodoka_data **ret, int argc, nodoka_data **argv) {
-    return Array_construct(global, func, ret, argc, argv);
+static enum nodoka_completion Array_native(nodoka_context *C, nodoka_object *func, nodoka_data *this, nodoka_data **ret, int argc, nodoka_data **argv) {
+    return Array_construct(C, func, ret, argc, argv);
 }
 
 void nodoka_newGlobal_Array(nodoka_global *global) {

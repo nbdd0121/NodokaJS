@@ -1,6 +1,8 @@
 #include "c/stdio.h"
+#include "c/stdlib.h"
 
 #include "js/lex.h"
+#include "js/pass.h"
 
 static void commonCodegen(nodoka_code_emitter *emitter, nodoka_node_list *node) {
     for (int i = 0; i < node->length; i++) {
@@ -12,14 +14,12 @@ static void commonCodegen(nodoka_code_emitter *emitter, nodoka_node_list *node) 
 static void codegenToken(nodoka_code_emitter *emitter, nodoka_token *node) {
     switch (node->type) {
         case NODOKA_TOKEN_ID: {
-            nodoka_emitBytecode(emitter, NODOKA_BC_LOAD_STR, nodoka_new_string(node->stringValue));
+            nodoka_emitBytecode(emitter, NODOKA_BC_LOAD_STR, nodoka_newStringDup(node->stringValue));
             nodoka_emitBytecode(emitter, NODOKA_BC_ID);
-            node->stringValue.str = NULL;
             break;
         }
         case NODOKA_TOKEN_STR: {
-            nodoka_emitBytecode(emitter, NODOKA_BC_LOAD_STR, nodoka_new_string(node->stringValue));
-            node->stringValue.str = NULL;
+            nodoka_emitBytecode(emitter, NODOKA_BC_LOAD_STR, nodoka_newStringDup(node->stringValue));
             break;
         }
         case NODOKA_TOKEN_NUM: {
@@ -58,7 +58,7 @@ static void codegenUnary(nodoka_code_emitter *emitter, nodoka_unary_node *node) 
             break;
         }
         case NODOKA_TYPEOF_NODE: {
-            commonUnary(emitter, node);
+            nodoka_codegen(emitter, node->_1);
             nodoka_emitBytecode(emitter, NODOKA_BC_TYPEOF);
             break;
         }
@@ -146,8 +146,9 @@ static void codegenUnary(nodoka_code_emitter *emitter, nodoka_unary_node *node) 
 
         case NODOKA_EXPR_STMT: {
             /* Remove the previous-set completion */
-            nodoka_emitBytecode(emitter, NODOKA_BC_POP);
             commonUnary(emitter, node);
+            nodoka_emitBytecode(emitter, NODOKA_BC_XCHG);
+            nodoka_emitBytecode(emitter, NODOKA_BC_POP);
             break;
         }
         default: assert(0);
@@ -511,8 +512,20 @@ void codegenTernary(nodoka_code_emitter *emitter, nodoka_ternary_node *node) {
 
 void codegen(nodoka_code_emitter *emitter, nodoka_node_list *node) {
     switch (node->type) {
+        case NODOKA_RETURN_STMT: {
+            /* must be function */
+            if (node->_[0]) {
+                nodoka_emitBytecode(emitter, NODOKA_BC_POP);
+                commonCodegen(emitter, node);
+                nodoka_emitBytecode(emitter, NODOKA_BC_RET);
+            } else {
+                nodoka_emitBytecode(emitter, NODOKA_BC_POP);
+                nodoka_emitBytecode(emitter, NODOKA_BC_UNDEF);
+                nodoka_emitBytecode(emitter, NODOKA_BC_RET);
+            }
+            break;
+        }
         case NODOKA_THROW_STMT: {
-            nodoka_emitBytecode(emitter, NODOKA_BC_POP);
             commonCodegen(emitter, node);
             nodoka_emitBytecode(emitter, NODOKA_BC_THROW);
             break;
@@ -540,10 +553,56 @@ void codegen(nodoka_code_emitter *emitter, nodoka_node_list *node) {
             nodoka_emitBytecode(emitter, NODOKA_BC_NEW, count);
             break;
         }
+        case NODOKA_VAR_STMT: {
+            if (node->_[1]) {
+                nodoka_codegen(emitter, node->_[0]);
+                nodoka_codegen(emitter, node->_[1]);
+                nodoka_emitBytecode(emitter, NODOKA_BC_GET);
+                nodoka_emitBytecode(emitter, NODOKA_BC_PUT);
+            }
+            break;
+        }
+        case NODOKA_FUNC_DECL: {
+            break;
+        }
         case NODOKA_STMT_LIST: {
             for (int i = 0; i < node->length; i++) {
                 nodoka_codegen(emitter, node->_[i]);
             }
+            break;
+        }
+        case NODOKA_FUNCTION_NODE: {
+            /* Codegen */
+            nodoka_code_emitter *funcBody = nodoka_newCodeEmitter();
+            nodoka_emitBytecode(funcBody, NODOKA_BC_UNDEF);
+            nodoka_codegen(funcBody, node->_[2]);
+            nodoka_emitBytecode(funcBody, NODOKA_BC_POP);
+            nodoka_emitBytecode(funcBody, NODOKA_BC_UNDEF);
+            nodoka_emitBytecode(funcBody, NODOKA_BC_RET);
+            nodoka_optimizer(funcBody);
+            nodoka_code *code = nodoka_packCode(funcBody);
+
+            nodoka_node_list *param = (nodoka_node_list *)node->_[1];
+            if (param) {
+                code->formalParameters.length = param->length;
+                code->formalParameters.array = malloc(param->length * sizeof(nodoka_string *));
+                for (int i = 0; i < param->length; i++) {
+                    nodoka_token *id = (nodoka_token *)param->_[i];
+                    assert(id->base.clazz == NODOKA_LEX_TOKEN && id->type == NODOKA_TOKEN_ID);
+                    code->formalParameters.array[i] = nodoka_new_string(id->stringValue);
+                    id->stringValue.str = NULL;
+                }
+            } else {
+                code->formalParameters.length = 0;
+                code->formalParameters.array = NULL;
+            }
+            if (node->_[0]) {
+                nodoka_token *id = (nodoka_token *)node->_[0];
+                assert(id->base.clazz == NODOKA_LEX_TOKEN && id->type == NODOKA_TOKEN_ID);
+                code->name = nodoka_new_string(id->stringValue);
+                id->stringValue.str = NULL;
+            }
+            nodoka_emitBytecode(emitter, NODOKA_BC_FUNC, code);
             break;
         }
         case NODOKA_FOR_STMT: {
@@ -573,6 +632,115 @@ void codegen(nodoka_code_emitter *emitter, nodoka_node_list *node) {
                 nodoka_relocate(emitter, rel, breakpoint);
             }
             nodoka_relocate(emitter, rel2, checkpoint);
+            break;
+        }
+        case NODOKA_FOR_VAR_STMT: {
+            nodoka_relocatable rel, rel2;
+            if (node->_[0]) {
+                nodoka_codegen(emitter, node->_[0]);
+            }
+            nodoka_label checkpoint = nodoka_putLabel(emitter);
+            if (node->_[1]) {
+                nodoka_codegen(emitter, node->_[1]);
+                nodoka_emitBytecode(emitter, NODOKA_BC_GET);
+                nodoka_emitBytecode(emitter, NODOKA_BC_BOOL);
+                nodoka_emitBytecode(emitter, NODOKA_BC_L_NOT);
+                nodoka_emitBytecode(emitter, NODOKA_BC_JT, &rel);
+            }
+            nodoka_codegen(emitter, node->_[3]);
+            if (node->_[2]) {
+                nodoka_codegen(emitter, node->_[2]);
+                nodoka_emitBytecode(emitter, NODOKA_BC_GET);
+                nodoka_emitBytecode(emitter, NODOKA_BC_POP);
+            }
+            nodoka_emitBytecode(emitter, NODOKA_BC_JMP, &rel2);
+            nodoka_label breakpoint = nodoka_putLabel(emitter);
+            if (node->_[1]) {
+                nodoka_relocate(emitter, rel, breakpoint);
+            }
+            nodoka_relocate(emitter, rel2, checkpoint);
+            break;
+        }
+        case NODOKA_TRY_STMT: {
+            nodoka_code *finallyBlock = NULL;
+            if (node->_[3]) {
+                nodoka_code_emitter *finallyBody = nodoka_newCodeEmitter();
+                nodoka_codegen(finallyBody, node->_[3]);
+                nodoka_emitBytecode(finallyBody, NODOKA_BC_RET);
+                nodoka_optimizer(finallyBody);
+                finallyBlock = nodoka_packCode(finallyBody);
+            }
+            nodoka_code_emitter *tryBody = nodoka_newCodeEmitter();
+            nodoka_relocatable catchPtr;
+            nodoka_emitBytecode(tryBody, NODOKA_BC_CATCH, &catchPtr);
+            nodoka_codegen(tryBody, node->_[0]);
+            if (node->_[1]) {
+                if (finallyBlock) {
+                    nodoka_label finallyRet = nodoka_putLabel(tryBody);
+                    nodoka_emitBytecode(tryBody, NODOKA_BC_NOCATCH);
+                    nodoka_emitBytecode(tryBody, NODOKA_BC_DUP);
+                    nodoka_emitBytecode(tryBody, NODOKA_BC_TRY, finallyBlock);
+                    nodoka_emitBytecode(tryBody, NODOKA_BC_POP);
+                    nodoka_emitBytecode(tryBody, NODOKA_BC_RET);
+                    nodoka_relocate(tryBody, catchPtr, nodoka_putLabel(tryBody));
+                    nodoka_relocatable finallyPtr;
+                    nodoka_emitBytecode(tryBody, NODOKA_BC_CATCH, &finallyPtr);
+                    nodoka_codegen(tryBody, node->_[1]);
+                    nodoka_emitBytecode(tryBody, NODOKA_BC_XCHG);
+                    nodoka_emitBytecode(tryBody, NODOKA_BC_PUT);
+                    nodoka_codegen(tryBody, node->_[2]);
+                    nodoka_relocatable toFinally;
+                    nodoka_emitBytecode(tryBody, NODOKA_BC_JMP, &toFinally);
+                    nodoka_relocate(tryBody, toFinally, finallyRet);
+                    nodoka_relocate(tryBody, finallyPtr, nodoka_putLabel(tryBody));
+                    nodoka_emitBytecode(tryBody, NODOKA_BC_NOCATCH);
+                    nodoka_emitBytecode(tryBody, NODOKA_BC_DUP);
+                    nodoka_emitBytecode(tryBody, NODOKA_BC_TRY, finallyBlock);
+                    nodoka_emitBytecode(tryBody, NODOKA_BC_POP);
+                    nodoka_emitBytecode(tryBody, NODOKA_BC_THROW);
+                } else {
+                    nodoka_emitBytecode(tryBody, NODOKA_BC_RET);
+                    nodoka_relocate(tryBody, catchPtr, nodoka_putLabel(tryBody));
+                    nodoka_codegen(tryBody, node->_[1]);
+                    nodoka_emitBytecode(tryBody, NODOKA_BC_NOCATCH);
+                    nodoka_emitBytecode(tryBody, NODOKA_BC_XCHG);
+                    nodoka_emitBytecode(tryBody, NODOKA_BC_PUT);
+                    nodoka_codegen(tryBody, node->_[2]);
+                    nodoka_emitBytecode(tryBody, NODOKA_BC_RET);
+                }
+            } else {
+                nodoka_emitBytecode(tryBody, NODOKA_BC_NOCATCH);
+                nodoka_emitBytecode(tryBody, NODOKA_BC_DUP);
+                nodoka_emitBytecode(tryBody, NODOKA_BC_TRY, finallyBlock);
+                nodoka_emitBytecode(tryBody, NODOKA_BC_POP);
+                nodoka_emitBytecode(tryBody, NODOKA_BC_RET);
+                nodoka_relocate(tryBody, catchPtr, nodoka_putLabel(tryBody));
+                nodoka_emitBytecode(tryBody, NODOKA_BC_NOCATCH);
+                nodoka_emitBytecode(tryBody, NODOKA_BC_DUP);
+                nodoka_emitBytecode(tryBody, NODOKA_BC_TRY, finallyBlock);
+                nodoka_emitBytecode(tryBody, NODOKA_BC_POP);
+                nodoka_emitBytecode(tryBody, NODOKA_BC_THROW);
+            }
+            nodoka_optimizer(tryBody);
+            nodoka_code *code = nodoka_packCode(tryBody);
+            nodoka_emitBytecode(emitter, NODOKA_BC_TRY, code);
+            break;
+        }
+        case NODOKA_ARR_LIT: {
+            nodoka_emitBytecode(emitter, NODOKA_BC_LOAD_ARR);
+            nodoka_emitBytecode(emitter, NODOKA_BC_LOAD_NUM, (double)node->length);
+            nodoka_emitBytecode(emitter, NODOKA_BC_NEW, 1);
+            for (int i = 0; i < node->length; i++) {
+                if (node->_[i]) {
+                    nodoka_emitBytecode(emitter, NODOKA_BC_DUP);
+                    nodoka_emitBytecode(emitter, NODOKA_BC_LOAD_NUM, (double)i);
+                    nodoka_emitBytecode(emitter, NODOKA_BC_STR);
+                    nodoka_emitBytecode(emitter, NODOKA_BC_REF);
+                    nodoka_codegen(emitter, node->_[i]);
+                    nodoka_emitBytecode(emitter, NODOKA_BC_GET);
+                    nodoka_emitBytecode(emitter, NODOKA_BC_PUT);
+                }
+            }
             break;
         }
         case NODOKA_OBJ_LIT: {

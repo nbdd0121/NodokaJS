@@ -53,6 +53,7 @@ nodoka_data *nodoka_new_data(enum nodoka_data_type type) {
         case NODOKA_REFERENCE: size = sizeof(nodoka_reference); break;
         case NODOKA_PROPERTY: size = sizeof(nodoka_prop_desc); break;
         case NODOKA_CODE: size = sizeof(nodoka_code); break;
+        case NODOKA_ENV: size = sizeof(nodoka_envRec); break;
         default: assert(0);
     }
     nodoka_data *data = malloc(size);

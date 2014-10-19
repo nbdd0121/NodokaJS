@@ -14,17 +14,20 @@
 #include "js/object.h"
 #include "js/builtin.h"
 
-int main(int argc, char **argv) {
+struct nodoka_config nodoka_config = {
+    .peehole = true,
+    .conv = true,
+    .fold = true,
+};
 
-    bool peehole = true;
-    bool conv = true;
-    bool fold = true;
+int main(int argc, char **argv) {
 
     bool dispBytecode = false;
     bool printResult = false;
 
 
     char *path = NULL;
+    char *output = NULL;
 
     for (int i = 1; i < argc; i++) {
         char *arg = argv[i];
@@ -37,13 +40,13 @@ int main(int argc, char **argv) {
                     name += 3;
                 }
                 if (strcmp(name, "peehole") == 0) {
-                    peehole = s;
+                    nodoka_config.peehole = s;
                 } else if (strcmp(name, "conversion-optimizer") == 0) {
-                    conv = s;
+                    nodoka_config.conv = s;
                 } else if (strcmp(name, "constant-folding") == 0) {
-                    fold = s;
+                    nodoka_config.fold = s;
                 }  else if (strcmp(name, "optimizer") == 0) {
-                    peehole = conv = fold = s;
+                    nodoka_config.peehole = nodoka_config.conv = nodoka_config.fold = s;
                 } else if (strcmp(name, "print-bytecode") == 0) {
                     dispBytecode = s;
                 } else if (strcmp(name, "print-result") == 0) {
@@ -54,7 +57,11 @@ int main(int argc, char **argv) {
             } else {
                 switch (arg[1]) {
                     case 'O': {
-                        peehole = conv = fold = true;
+                        nodoka_config.peehole = nodoka_config.conv = nodoka_config.fold = true;
+                        break;
+                    }
+                    case 'o': {
+                        output = argv[++i];
                         break;
                     }
                     default:
@@ -80,68 +87,74 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    /* Syntax */
-    nodoka_lex *lex = lex_new(buffer);
-    free(buffer);
-    nodoka_grammar *grammar = grammar_new(lex);
-    nodoka_lex_class *ast = grammar_program(grammar);
-
-    /* Codegen */
-    nodoka_code_emitter *emitter = nodoka_newCodeEmitter();
-    nodoka_emitBytecode(emitter, NODOKA_BC_UNDEF);
-    nodoka_codegen(emitter, ast);
-    nodoka_disposeLexNode(ast);
-    nodoka_emitBytecode(emitter, NODOKA_BC_RET);
-
-    /* Optimize */
-    for (int i = 0; i < 10; i++) {
-        bool mod = false;
-        if (conv) {
-            mod |= nodoka_intraPcr(emitter, nodoka_convPass);
-        }
-        if (fold) {
-            mod |= nodoka_intraPcr(emitter, nodoka_foldPass);
-        }
-        if (peehole) {
-            mod |= nodoka_intraPcr(emitter, nodoka_peeholePass);
-        }
-        if (!mod) {
-            break;
-        }
-    }
-
-    /* Execute */
-    nodoka_code *code = nodoka_packCode(emitter);
-
-    if (dispBytecode) {
-        nodoka_printBytecode(code);
-    }
-
     nodoka_global global;
     nodoka_newGlobal(&global);
 
-    nodoka_envRec *env = nodoka_newObjEnvRecord(global.global, NULL);
+    {
+        size_t size;
+        char *buffer = nodoka_readFile("/home/gary/Projects/NodokaJS/startup.js", &size);
+        if (!buffer) {
+            printf("NodokaJS: Unable to load startup files\n");
+            return 1;
+        }
 
+        utf16_string_t str = unicode_toUtf16(UTF8_STRING(buffer));
+        nodoka_code *code = nodoka_compile(str);
+        free(str.str);
+
+        nodoka_envRec *env = nodoka_newObjEnvRecord(global.global, NULL);
+        nodoka_context *context = nodoka_newContext(&global, env, code, global.global);
+
+        nodoka_data *retVal;
+        if (nodoka_exec(context, &retVal) == NODOKA_COMPLETION_THROW) {
+            nodoka_string *retStr = nodoka_toString(context, retVal);
+            /* Result */
+            printf("\033[1;31mUncaught ");
+            unicode_putUtf16(retStr->value);
+            printf("\033[0m\n");
+        }
+    }
+
+    nodoka_code *code;
+    if (buffer[0]) {
+        utf16_string_t str = unicode_toUtf16(UTF8_STRING(buffer));
+        free(buffer);
+        code = nodoka_compile(str);
+        free(str.str);
+    } else {
+        free(buffer);
+        code = nodoka_loadBytecode(path);
+    }
+
+    if (output)
+        nodoka_storeBytecode(output, code);
+
+    if (dispBytecode) {
+        nodoka_printBytecode(code, 0);
+    }
+
+    nodoka_envRec *env = nodoka_newObjEnvRecord(global.global, NULL);
     nodoka_context *context = nodoka_newContext(&global, env, code, global.global);
+
     nodoka_data *retVal;
     enum nodoka_completion comp = nodoka_exec(context, &retVal);
     switch (comp) {
         case NODOKA_COMPLETION_RETURN: {
             if (printResult) {
                 nodoka_data *ret;
-                nodoka_colorDir(NULL, NULL, &ret, 1, (nodoka_data *[1]) {
+                nodoka_colorDir(context, NULL, NULL, &ret, 1, (nodoka_data *[1]) {
                     retVal
                 });
             }
             break;
         }
         case NODOKA_COMPLETION_THROW: {
-            nodoka_string *retStr = nodoka_toString(&global, retVal);
+            nodoka_string *retStr = nodoka_toString(context, retVal);
             /* Result */
-            printf("\033[1;31mUncaught ");
-            unicode_putUtf16(retStr->value);
-            printf("\033[0m\n");
-            break;
+            fprintf(stderr, "\033[1;31mUncaught ");
+            unicode_fputUtf16(stderr, retStr->value);
+            fprintf(stderr, "\033[0m\n");
+            return -1;
         }
         default: assert(0);
     }

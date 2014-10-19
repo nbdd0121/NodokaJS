@@ -15,6 +15,23 @@ bool nodoka_peeholePass(nodoka_code_emitter *emitter, nodoka_code_emitter *targe
     for (size_t i = start; i < end;) {
         enum nodoka_bytecode bc = nodoka_pass_fetch8(emitter, &i);
         switch (bc) {
+            case NODOKA_BC_DECL: {
+                //since decl are always the first nodes, having a decl pointing to a existing string means already declared
+                uint16_t offset = nodoka_pass_fetch16(emitter, &i);
+                nodoka_string *str = emitter->stringPool[offset];
+                int i;
+                for (i = 0; i < target->strPoolLength; i++) {
+                    if (target->stringPool[i] == str) {
+                        break;
+                    }
+                }
+                if (i == target->strPoolLength) {
+                    nodoka_emitBytecode(target, bc, str);
+                } else {
+                    mod = true;
+                }
+                continue;
+            }
             case NODOKA_BC_UNDEF: {
                 /* UNDEF POP can be removed with no side-effect */
                 if (i < end && emitter->bytecode[i] == NODOKA_BC_POP) {
@@ -70,18 +87,28 @@ bool nodoka_peeholePass(nodoka_code_emitter *emitter, nodoka_code_emitter *targe
                     mod = true;
                     continue;
                 } /*else if (i + 2 < end && emitter->bytecode[i] == NODOKA_BC_XCHG && emitter->bytecode[i + 2] == NODOKA_BC_XCHG) {
-                switch (emitter->bytecode[i + 1]) {
-                    case NODOKA_BC_PRIM:
-                    case NODOKA_BC_NUM: {
-                        nodoka_emitBytecode(target, emitter->bytecode[i + 1]);
-                        nodoka_emitBytecode(target, bc, val);
-                        i += 3;
-                        mod = true;
-                        continue;
-                    }
-                }
-            }*/
+switch (emitter->bytecode[i + 1]) {
+case NODOKA_BC_PRIM:
+case NODOKA_BC_NUM: {
+nodoka_emitBytecode(target, emitter->bytecode[i + 1]);
+nodoka_emitBytecode(target, bc, val);
+i += 3;
+mod = true;
+continue;
+}
+}
+}*/
                 nodoka_emitBytecode(target, bc, val);
+                continue;
+            }
+            case NODOKA_BC_FUNC: {
+                uint16_t offset = nodoka_pass_fetch16(emitter, &i);
+                nodoka_emitBytecode(target, bc, emitter->codePool[offset]);
+                continue;
+            }
+            case NODOKA_BC_TRY: {
+                uint16_t offset = nodoka_pass_fetch16(emitter, &i);
+                nodoka_emitBytecode(target, bc, emitter->codePool[offset]);
                 continue;
             }
             case NODOKA_BC_CALL:
@@ -133,6 +160,14 @@ bool nodoka_peeholePass(nodoka_code_emitter *emitter, nodoka_code_emitter *targe
                     continue;
                 }
                 break;
+            }
+            case NODOKA_BC_RET:
+            case NODOKA_BC_THROW: {
+                if (i != end) {
+                    mod = true;
+                }
+                nodoka_emitBytecode(target, bc);
+                return mod;
             }
             default:
                 break;

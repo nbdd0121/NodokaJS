@@ -19,10 +19,12 @@ enum nodoka_data_type {
 
     NODOKA_PROPERTY = 0x80,
     NODOKA_CODE = 0x100,
+
+    NODOKA_ENV = 0x200
 };
 
 typedef struct {
-    uint8_t type;
+    enum nodoka_data_type type;
 } nodoka_data;
 
 typedef struct {
@@ -33,6 +35,7 @@ typedef struct {
 typedef struct {
     nodoka_data base;
     utf16_string_t value;
+    nodoka_number *numberCache;
 } nodoka_string;
 
 typedef struct {
@@ -46,6 +49,7 @@ typedef struct nodoka_prop_desc nodoka_prop_desc;
 typedef struct nodoka_code nodoka_code;
 typedef struct nodoka_code_emitter nodoka_code_emitter;
 typedef struct nodoka_context nodoka_context;
+typedef struct nodoka_envRec nodoka_envRec;
 
 enum nodoka_completion {
     NODOKA_COMPLETION_NORMAL,
@@ -61,7 +65,21 @@ typedef struct nodoka_global {
     nodoka_object *Function_prototype;
     nodoka_object *Array;
     nodoka_object *Array_prototype;
+    nodoka_object *String;
+    nodoka_object *String_prototype;
+    nodoka_object *Error;
+    nodoka_object *Error_prototype;
+    nodoka_object *ReferenceError;
+    nodoka_object *ReferenceError_prototype;
+    nodoka_object *TypeError;
+    nodoka_object *TypeError_prototype;
 } nodoka_global;
+
+struct nodoka_config {
+    bool peehole;
+    bool conv;
+    bool fold;
+};
 
 enum nodoka_completion nodoka_exec(nodoka_context *context, nodoka_data **ret);
 
@@ -71,7 +89,7 @@ bool nodoka_sameValue(nodoka_data *x, nodoka_data *y);
 bool nodoka_strictEqComp(nodoka_data *x, nodoka_data *y);
 bool nodoka_absEqComp(nodoka_data *x, nodoka_data *y);
 
-void nodoka_printBytecode(nodoka_code *);
+void nodoka_printBytecode(nodoka_code *, int indent);
 
 void nodoka_initConstant(void);
 void nodoka_initStringPool(void);
@@ -93,12 +111,12 @@ nodoka_data *nodoka_toBoolean(nodoka_data *value);
 nodoka_number *nodoka_toNumber(nodoka_data *value);
 int32_t nodoka_toInt32(nodoka_number *value);
 uint32_t nodoka_toUint32(nodoka_number *value);
-int16_t nodoka_toInt16(nodoka_number *value);
-nodoka_string *nodoka_toString(nodoka_global *G, nodoka_data *value);
-nodoka_object *nodoka_toObject(nodoka_data *value);
+uint16_t nodoka_toUint16(nodoka_number *value);
+nodoka_string *nodoka_toString(nodoka_context *C, nodoka_data *value);
+nodoka_object *nodoka_toObject(nodoka_context *C, nodoka_data *value);
 
 /* vm/string.c */
-nodoka_string *nodoka_concatString(nodoka_string *lstr, nodoka_string *rstr);
+nodoka_string *nodoka_concatString(size_t i, ...);
 
 /* bcloader.c */
 char *nodoka_readFile(char *path, size_t *sizePtr);
@@ -129,5 +147,7 @@ extern nodoka_string *nodoka_zeroStr;
 #define assertNumber(data) assertType(data, NODOKA_NUMBER)
 #define assertString(data) assertType(data, NODOKA_STRING)
 #define assertBoolean(data) assertType(data, NODOKA_BOOL)
+
+extern struct nodoka_config nodoka_config;
 
 #endif

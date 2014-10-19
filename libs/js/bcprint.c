@@ -32,19 +32,42 @@ static uint64_t fetch64(nodoka_code *context, size_t *ptr) {
     return ret;
 }
 
-void nodoka_printBytecode(nodoka_code *codeseg) {
+void nodoka_printBytecode(nodoka_code *codeseg, int indent) {
 #define DECL_OP(op) case NODOKA_BC_##op: printf(#op); break
-
-    printf("String Pool:\n");
-    for (int i = 0; i < codeseg->strPoolLength; i++) {
-        printf("  [%d] = \"", i);
-        unicode_putUtf16(codeseg->stringPool[i]->value);
-        printf("\"\n");
+    if (codeseg->name && codeseg->name->value.len) {
+        printf("%*sName: ", indent, "");
+        unicode_putUtf16(codeseg->name->value);
+        printf("\n");
     }
-    printf("Bytecode:\n");
+    if (codeseg->formalParameters.length) {
+        printf("%*sFormalParameters: [", indent, "");
+        for (int i = 0; i < codeseg->formalParameters.length; i++) {
+            if (i != 0) {
+                printf(", ");
+            }
+            unicode_putUtf16(codeseg->formalParameters.array[i]->value);
+        }
+        printf("]\n");
+    }
+    if (codeseg->strPoolLength) {
+        printf("%*sString Pool:\n", indent, "");
+        for (int i = 0; i < codeseg->strPoolLength; i++) {
+            printf("%*s[%d] = \"", indent + 2, "", i);
+            unicode_putUtf16(codeseg->stringPool[i]->value);
+            printf("\"\n");
+        }
+    }
+    if (codeseg->codePoolLength) {
+        printf("%*sCode Pool:\n", indent, "");
+        for (int i = 0; i < codeseg->codePoolLength; i++) {
+            printf("%*s[%d] = \n", indent + 2, "", i);
+            nodoka_printBytecode(codeseg->codePool[i], indent + 4);
+        }
+    }
+    printf("%*sBytecode:\n", indent, "");
     for (size_t i = 0; i < codeseg->bytecodeLength; ) {
         enum nodoka_bytecode bc = fetchByte(codeseg, &i);
-        printf("%5d ", i - 1);
+        printf("%*s%5d ", indent, "", i - 1);
         switch (bc) {
             case NODOKA_BC_LOAD_STR: {
                 uint16_t index = fetch16(codeseg, &i);
@@ -55,6 +78,16 @@ void nodoka_printBytecode(nodoka_code *codeseg) {
             }
             case NODOKA_BC_LOAD_NUM: {
                 printf("LOAD_NUM %lf", int2double(fetch64(codeseg, &i)));
+                break;
+            }
+            case NODOKA_BC_FUNC: {
+                uint16_t index = fetch16(codeseg, &i);
+                printf("FUNC #%d", index);
+                break;
+            }
+            case NODOKA_BC_TRY: {
+                uint16_t index = fetch16(codeseg, &i);
+                printf("TRY #%d", index);
                 break;
             }
             case NODOKA_BC_CALL: {
@@ -73,11 +106,24 @@ void nodoka_printBytecode(nodoka_code *codeseg) {
                 printf("JMP %d", fetch16(codeseg, &i));
                 break;
             }
+            case NODOKA_BC_CATCH: {
+                uint16_t index = fetch16(codeseg, &i);
+                printf("CATCH %d", index);
+                break;
+            }
+            case NODOKA_BC_DECL: {
+                uint16_t index = fetch16(codeseg, &i);
+                printf("DECL #%d (\"", index);
+                unicode_putUtf16(codeseg->stringPool[index]->value);
+                printf("\")");
+                break;
+            }
             DECL_OP(UNDEF);
             DECL_OP(NULL);
             DECL_OP(TRUE);
             DECL_OP(FALSE);
             DECL_OP(LOAD_OBJ);
+            DECL_OP(LOAD_ARR);
             DECL_OP(NOP);
             DECL_OP(DUP);
             DECL_OP(POP);
@@ -117,6 +163,7 @@ void nodoka_printBytecode(nodoka_code *codeseg) {
             DECL_OP(XCHG3);
 
             DECL_OP(THROW);
+            DECL_OP(NOCATCH);
 
 
             default: assert(0);

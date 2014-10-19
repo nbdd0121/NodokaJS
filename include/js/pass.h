@@ -16,4 +16,7 @@ bool nodoka_peeholePass(nodoka_code_emitter *codeseg, nodoka_code_emitter *targe
 bool nodoka_convPass(nodoka_code_emitter *emitter, nodoka_code_emitter *target, size_t start, size_t end);
 bool nodoka_foldPass(nodoka_code_emitter *emitter, nodoka_code_emitter *target, size_t start, size_t end);
 
+nodoka_code *nodoka_compile(utf16_string_t str);
+void nodoka_optimizer(nodoka_code_emitter *emitter);
+
 #endif

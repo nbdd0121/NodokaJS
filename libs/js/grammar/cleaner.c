@@ -14,6 +14,13 @@ void nodoka_disposeLexNode(nodoka_lex_class *node) {
                 if (str) {
                     free(str);
                 }
+            } else if (n->type == NODOKA_TOKEN_REGEXP) {
+                uint16_t *str = n->regexp.str;
+                if (str)
+                    free(str);
+                str = n->flags.str;
+                if (str)
+                    free(str);
             }
             free(n);
             break;

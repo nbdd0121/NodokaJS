@@ -9,6 +9,7 @@
 
 #include "c/stdint.h"
 #include "c/string.h"
+#include "c/stdio.h"
 
 typedef struct {
     uint8_t *str;
@@ -28,5 +29,7 @@ utf16_string_t unicode_toUtf16(utf8_string_t utf8);
 utf8_string_t unicode_toUtf8(utf16_string_t utf16);
 void unicode_putUtf8(utf8_string_t utf8);
 void unicode_putUtf16(utf16_string_t utf16);
+void unicode_fputUtf8(FILE *file, utf8_string_t utf8);
+void unicode_fputUtf16(FILE *file, utf16_string_t utf16);
 
 #endif

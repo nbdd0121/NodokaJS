@@ -40,7 +40,7 @@ bool nodoka_foldPass(nodoka_code_emitter *emitter, nodoka_code_emitter *target, 
     nodoka_data **typeStack = malloc(128);
     nodoka_data **stackTop = typeStack;
     nodoka_data **stackLimit = typeStack + 128;
-    bool modified = false;
+    bool mod = false;
     for (size_t i = start; i < end;) {
         enum nodoka_bytecode bc = nodoka_pass_fetch8(emitter, &i);
         switch (bc) {
@@ -63,6 +63,16 @@ bool nodoka_foldPass(nodoka_code_emitter *emitter, nodoka_code_emitter *target, 
             case NODOKA_BC_LOAD_OBJ: {
                 PUSH(NULL);
                 break;
+            }
+            case NODOKA_BC_LOAD_ARR: {
+                PUSH(NULL);
+                break;
+            }
+            case NODOKA_BC_FUNC: {
+                nodoka_code *code = emitter->codePool[nodoka_pass_fetch16(emitter, &i)];
+                PUSH(NULL);
+                nodoka_emitBytecode(target, bc, code);
+                continue;
             }
             case NODOKA_BC_NOP: continue;
             case NODOKA_BC_DUP: {
@@ -88,7 +98,22 @@ bool nodoka_foldPass(nodoka_code_emitter *emitter, nodoka_code_emitter *target, 
                 PUSH(sp1);
                 break;
             }
-            case NODOKA_BC_RET: break;
+            case NODOKA_BC_RET:
+            case NODOKA_BC_THROW: {
+                if (i != end) {
+                    i = end;
+                    mod = true;
+                }
+                break;
+            }
+            case NODOKA_BC_TRY: {
+                uint16_t offset = nodoka_pass_fetch16(emitter, &i);
+                PUSH(NULL);
+                nodoka_emitBytecode(target, bc, emitter->codePool[offset]);
+                continue;
+            }
+            case NODOKA_BC_NOCATCH:
+                break;
             case NODOKA_BC_THIS: PUSH(NULL); break;
             /* Notice that constants are all primitives, so this instruction needs no special deal */
             case NODOKA_BC_PRIM: break;
@@ -253,7 +278,7 @@ bool nodoka_foldPass(nodoka_code_emitter *emitter, nodoka_code_emitter *target, 
                     if (sp1->type == NODOKA_STRING || sp0->type == NODOKA_STRING) {
                         nodoka_string *lstr = nodoka_toString(NULL, sp1);
                         nodoka_string *rstr = nodoka_toString(NULL, sp0);
-                        nodoka_string *result = nodoka_concatString(lstr, rstr);
+                        nodoka_string *result = nodoka_concatString(2, lstr, rstr);
                         PUSH((nodoka_data *)result);
                         nodoka_emitBytecode(target, NODOKA_BC_LOAD_STR, result);
                     } else {
@@ -295,6 +320,11 @@ bool nodoka_foldPass(nodoka_code_emitter *emitter, nodoka_code_emitter *target, 
                 }
                 break;
             }
+            case NODOKA_BC_DECL: {
+                uint16_t offset = nodoka_pass_fetch16(emitter, &i);
+                nodoka_emitBytecode(target, bc, emitter->stringPool[offset]);
+                continue;
+            }
             default: {
                 assert(0);
                 break;
@@ -303,6 +333,6 @@ bool nodoka_foldPass(nodoka_code_emitter *emitter, nodoka_code_emitter *target, 
         nodoka_emitBytecode(target, bc);
     }
     free(typeStack);
-    return modified;
+    return mod;
 }
 

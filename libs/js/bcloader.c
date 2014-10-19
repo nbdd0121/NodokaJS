@@ -57,10 +57,17 @@ static nodoka_string *readConstString(char *buffer, size_t *ptr) {
 }
 
 static size_t countString(nodoka_string *str) {
+    if (!str) {
+        return 2;
+    }
     return 2 + str->value.len * 2;
 }
 
 static void writeConstString(char *buffer, size_t *ptr, nodoka_string *string) {
+    if (!string) {
+        write16(buffer, ptr, 0);
+        return;
+    }
     write16(buffer, ptr, string->value.len);
     for (int i = 0; i < string->value.len; i++) {
         write16(buffer, ptr, string->value.str[i]);
@@ -83,6 +90,11 @@ static nodoka_code *readConstCodeSegment(char *buffer, size_t *ptr) {
     }
     memcpy(code->bytecode, &buffer[*ptr], code->bytecodeLength);
     *ptr += code->bytecodeLength;
+    code->formalParameters.length = read16(buffer, ptr);
+    for (int i = 0; i < code->formalParameters.length; i++) {
+        code->formalParameters.array[i] = readConstString(buffer, ptr);
+    }
+    code->name = readConstString(buffer, ptr);
     return code;
 }
 
@@ -98,6 +110,11 @@ static void writeConstCode(char *buffer, size_t *ptr, nodoka_code *code) {
     }
     memcpy(&buffer[*ptr], code->bytecode, code->bytecodeLength);
     *ptr += code->bytecodeLength;
+    write16(buffer, ptr, code->formalParameters.length);
+    for (int i = 0; i < code->formalParameters.length; i++) {
+        writeConstString(buffer, ptr, code->formalParameters.array[i]);
+    }
+    writeConstString(buffer, ptr, code->name);
 }
 
 static size_t countCode(nodoka_code *code) {
@@ -108,7 +125,17 @@ static size_t countCode(nodoka_code *code) {
     for (int i = 0; i < code->codePoolLength; i++) {
         size += countCode(code->codePool[i]);
     }
+
     size += code->bytecodeLength;
+
+    {
+        size += 2;
+        for (int i = 0; i < code->formalParameters.length; i++) {
+            size += countString(code->formalParameters.array[i]);
+        }
+    }
+
+    size += countString(code->name);
     return size;
 }
 
@@ -118,7 +145,7 @@ nodoka_code *nodoka_loadBytecode(char *path) {
     if (!buffer) {
         return NULL;
     }
-    size_t ptr = 0;
+    size_t ptr = 8;
     nodoka_code *code = readConstCodeSegment(buffer, &ptr);
     free(buffer);
     assert(ptr == size);
@@ -126,9 +153,17 @@ nodoka_code *nodoka_loadBytecode(char *path) {
 }
 
 void nodoka_storeBytecode(char *path, nodoka_code *code) {
-    size_t size = countCode(code);
+    size_t size = countCode(code) + 8;
     char *buffer = malloc(size);
-    size_t ptr = 0;
+    buffer[0] = 0;
+    buffer[1] = 'n';
+    buffer[2] = 'o';
+    buffer[3] = 'd';
+    buffer[4] = 'o';
+    buffer[5] = 'k';
+    buffer[6] = 'a';
+    buffer[7] = 0;
+    size_t ptr = 8;
     writeConstCode(buffer, &ptr, code);
     assert(ptr == size);
     nodoka_writeFile(path, buffer, size);

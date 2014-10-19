@@ -119,3 +119,13 @@ void unicode_putUtf16(utf16_string_t utf16) {
     unicode_putUtf8(u8);
     free(u8.str);
 }
+
+void unicode_fputUtf8(FILE *file, utf8_string_t utf8) {
+    fprintf(file, "%.*s", utf8.len, utf8.str);
+}
+
+void unicode_fputUtf16(FILE *file, utf16_string_t utf16) {
+    utf8_string_t u8 = unicode_toUtf8(utf16);
+    unicode_fputUtf8(file, u8);
+    free(u8.str);
+}

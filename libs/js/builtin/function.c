@@ -3,13 +3,13 @@
 #include "js/builtin.h"
 #include "js/object.h"
 
-static enum nodoka_completion newFunction_native(nodoka_global *global, nodoka_object *O, nodoka_data **ret, int argc, nodoka_data **argv) {
+static enum nodoka_completion newFunction_native(nodoka_context *C, nodoka_object *O, nodoka_data **ret, int argc, nodoka_data **argv) {
     *ret = (nodoka_data *)nodoka_newStringFromUtf8("UnsupportedError: Cannot create new function");
     return NODOKA_COMPLETION_THROW;
 }
 
-static enum nodoka_completion function_native(nodoka_global *global, nodoka_object *func, nodoka_data *this, nodoka_data **ret, int argc, nodoka_data **argv) {
-    return newFunction_native(global, func, ret, argc, argv);
+static enum nodoka_completion function_native(nodoka_context *C, nodoka_object *func, nodoka_data *this, nodoka_data **ret, int argc, nodoka_data **argv) {
+    return newFunction_native(C, func, ret, argc, argv);
 }
 
 nodoka_object *nodoka_newNativeFunction(nodoka_global *global, nodoka_call_func func, uint32_t argc) {
@@ -23,12 +23,12 @@ nodoka_object *nodoka_newNativeFunction(nodoka_global *global, nodoka_call_func 
     return function;
 }
 
-static enum nodoka_completion prototype_native(nodoka_global *global, nodoka_object *func, nodoka_data *this, nodoka_data **ret, int argc, nodoka_data **argv) {
+static enum nodoka_completion prototype_native(nodoka_context *C, nodoka_object *func, nodoka_data *this, nodoka_data **ret, int argc, nodoka_data **argv) {
     *ret = nodoka_undefined;
     return NODOKA_COMPLETION_RETURN;
 }
 
-static enum nodoka_completion prototype_toString(nodoka_global *global, nodoka_object *func, nodoka_data *this, nodoka_data **ret, int argc, nodoka_data **argv) {
+static enum nodoka_completion prototype_toString(nodoka_context *C, nodoka_object *func, nodoka_data *this, nodoka_data **ret, int argc, nodoka_data **argv) {
     if (this->type == NODOKA_OBJECT) {
         nodoka_object *obj = (nodoka_object *)this;
         if (obj->call) {

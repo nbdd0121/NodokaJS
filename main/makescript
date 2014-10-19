@@ -19,7 +19,7 @@ recursiveList(".").forEach(function(file) {
 var cCompiler = "gcc";
 var cFlags = (
   "-I ../include/ -I ./ " +
-  "-Os -c -g " +
+  "-O0 -c -g " +
   "-fno-signed-char -funsigned-char -Wimplicit " +
   "-Wall --std=gnu99"
 ).split(" ");

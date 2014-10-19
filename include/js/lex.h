@@ -10,7 +10,7 @@
 #define OTHER_FLAG 0x200
 #define KEYWORD_FLAG 0x400
 
-enum nodoka_nodoka_lexype {
+enum nodoka_lex_type {
     NODOKA_LEX_TOKEN,
     NODOKA_LEX_EMPTY_NODE,
     NODOKA_LEX_UNARY_NODE,
@@ -196,12 +196,14 @@ enum nodoka_ternary_node_type {
 
 enum nodoka_node_list_type {
     /* Unary */
+    NODOKA_RETURN_STMT,
     NODOKA_THROW_STMT,
 
     /* Binary */
     NODOKA_OBJ_LIT_VAL,
     NODOKA_NEW_NODE,
-    NODOKA_STMT_LIST,
+    NODOKA_VAR_STMT,
+    NODOKA_FUNC_DECL,
 
     NODOKA_INTERNAL_LIST,
 
@@ -210,14 +212,18 @@ enum nodoka_node_list_type {
 
     /* Quaternary */
     NODOKA_FOR_STMT,
+    NODOKA_FOR_VAR_STMT,
+    NODOKA_TRY_STMT,
 
     /* Var-length */
+    NODOKA_ARR_LIT,
     NODOKA_OBJ_LIT,
     NODOKA_ARG_LIST,
+    NODOKA_STMT_LIST,
 };
 
 typedef struct nodoka_lex_class {
-    enum nodoka_nodoka_lexype clazz;
+    enum nodoka_lex_type clazz;
 } nodoka_lex_class;
 
 typedef struct nodoka_token {
@@ -227,6 +233,10 @@ typedef struct nodoka_token {
     union {
         utf16_string_t stringValue;
         double numberValue;
+        struct {
+            utf16_string_t regexp;
+            utf16_string_t flags;
+        };
     };
     bool lineBefore;
 } nodoka_token;
@@ -272,7 +282,6 @@ struct struct_lex {
     nodoka_token *(*state)(nodoka_lex *lex);
     utf16_string_t content;
     size_t ptr;
-    bool regexp;
     bool strictMode;
     bool lineBefore;
     bool parseId;
@@ -281,6 +290,7 @@ struct struct_lex {
             uint16_t *buffer;
             size_t size;
             size_t length;
+            utf16_string_t regexpContent;
         };
         struct {
             double number;
@@ -293,11 +303,14 @@ struct struct_lex {
 
 typedef struct struct_grammar nodoka_grammar;
 
-nodoka_lex *lex_new(char *chr);
+nodoka_lex *lex_new(utf16_string_t utf16);
 nodoka_token *lex_next(nodoka_lex *lex);
+nodoka_token *lex_regexp(nodoka_lex *lex, bool assign);
 nodoka_grammar *grammar_new(nodoka_lex *lex);
 void nodoka_codegen(nodoka_code_emitter *emitter, nodoka_lex_class *node);
+void nodoka_declgen(nodoka_code_emitter *emitter, nodoka_lex_class *node);
 void nodoka_disposeLexNode(nodoka_lex_class *node);
+nodoka_lex_class *grammar_program(nodoka_grammar *gmr);
 
 #endif
 

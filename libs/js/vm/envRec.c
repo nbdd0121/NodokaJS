@@ -4,7 +4,7 @@
 #include "js/object.h"
 
 nodoka_envRec *nodoka_newDeclEnvRecord(nodoka_envRec *outer) {
-    nodoka_envRec *rec = malloc(sizeof(nodoka_envRec));
+    nodoka_envRec *rec = (nodoka_envRec *)nodoka_new_data(NODOKA_ENV);
     rec->outer = outer;
     rec->object = nodoka_newNativeObject();
     rec->this = nodoka_undefined;
@@ -12,7 +12,7 @@ nodoka_envRec *nodoka_newDeclEnvRecord(nodoka_envRec *outer) {
 }
 
 nodoka_envRec *nodoka_newObjEnvRecord(nodoka_object *obj, nodoka_envRec *outer) {
-    nodoka_envRec *rec = malloc(sizeof(nodoka_envRec));
+    nodoka_envRec *rec = (nodoka_envRec *)nodoka_new_data(NODOKA_ENV);
     rec->outer = outer;
     rec->object = obj;
     rec->this = (nodoka_data *)obj;

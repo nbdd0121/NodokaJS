@@ -9,10 +9,10 @@
 enum {
     DEF_BC_CAPACITY = 256,
     DEF_STR_POOL_CAPACITY = 16,
-    DEF_CODE_POOL_CAPACITY = 0,
+    DEF_CODE_POOL_CAPACITY = 8,
     BC_CAPACITY_INC_STEP = 128,
     STR_POOL_CAPACITY_INC_STEP = 16,
-    CODE_POOL_CAPACITY_INC_STEP = 1,
+    CODE_POOL_CAPACITY_INC_STEP = 2,
 };
 
 nodoka_code_emitter *nodoka_newCodeEmitter(void) {
@@ -61,10 +61,26 @@ static uint16_t nodoka_emitString(nodoka_code_emitter *emitter, nodoka_string *s
 
     if (emitter->strPoolLength == emitter->strPoolCapacity) {
         emitter->strPoolCapacity += STR_POOL_CAPACITY_INC_STEP;
-        emitter->stringPool = realloc(emitter->stringPool, emitter->strPoolCapacity);
+        emitter->stringPool = realloc(emitter->stringPool, emitter->strPoolCapacity * sizeof(nodoka_string *));
     }
+
     uint16_t id = emitter->strPoolLength++;
     emitter->stringPool[id] = str;
+    return id;
+}
+
+static uint16_t nodoka_emitCode(nodoka_code_emitter *emitter, nodoka_code *code) {
+    for (int i = 0; i < emitter->codePoolLength; i++) {
+        if (code == emitter->codePool[i]) {
+            return i;
+        }
+    }
+    if (emitter->codePoolLength == emitter->codePoolCapacity) {
+        emitter->codePoolCapacity += CODE_POOL_CAPACITY_INC_STEP;
+        emitter->codePool = realloc(emitter->codePool, emitter->codePoolCapacity * sizeof(nodoka_code *));
+    }
+    uint16_t id = emitter->codePoolLength++;
+    emitter->codePool[id] = code;
     return id;
 }
 
@@ -73,7 +89,8 @@ void nodoka_emitBytecode(nodoka_code_emitter *emitter, uint8_t bc, ...) {
     va_list ap;
     va_start(ap, bc);
     switch (bc) {
-        case NODOKA_BC_LOAD_STR: {
+        case NODOKA_BC_LOAD_STR:
+        case NODOKA_BC_DECL: {
             nodoka_string *str = va_arg(ap, nodoka_string *);
             uint16_t imm16 = nodoka_emitString(emitter, str);
             nodoka_emit16(emitter, imm16);
@@ -85,6 +102,13 @@ void nodoka_emitBytecode(nodoka_code_emitter *emitter, uint8_t bc, ...) {
             nodoka_emit64(emitter, imm64);
             break;
         }
+        case NODOKA_BC_FUNC:
+        case NODOKA_BC_TRY: {
+            nodoka_code *str = va_arg(ap, nodoka_code *);
+            uint16_t imm16 = nodoka_emitCode(emitter, str);
+            nodoka_emit16(emitter, imm16);
+            break;
+        }
         case NODOKA_BC_CALL:
         case NODOKA_BC_NEW: {
             size_t count = va_arg(ap, size_t);
@@ -92,7 +116,8 @@ void nodoka_emitBytecode(nodoka_code_emitter *emitter, uint8_t bc, ...) {
             break;
         }
         case NODOKA_BC_JMP:
-        case NODOKA_BC_JT: {
+        case NODOKA_BC_JT:
+        case NODOKA_BC_CATCH: {
             nodoka_relocatable *rel = va_arg(ap, nodoka_relocatable *);
             if (rel)
                 *rel = emitter->bytecodeLength;
@@ -150,16 +175,23 @@ nodoka_code *nodoka_packCode(nodoka_code_emitter *emitter) {
     code->strPoolLength = emitter->strPoolLength;
     code->codePoolLength = emitter->codePoolLength;
     code->bytecodeLength = emitter->bytecodeLength;
+    code->formalParameters.length = 0;
+    code->formalParameters.array = NULL;
+    code->name = NULL;
+    free(emitter);
     return code;
 }
 
-nodoka_code_emitter *nodoka_unpackCode(nodoka_code *code) {
-    nodoka_code_emitter *emitter = malloc(sizeof(nodoka_code_emitter));
-    emitter->stringPool = code->stringPool;
-    emitter->codePool = code->codePool;
-    emitter->bytecode = code->bytecode;
-    emitter->strPoolCapacity = emitter->strPoolLength = code->strPoolLength;
-    emitter->codePoolCapacity = emitter->codePoolLength = code->codePoolLength;
-    emitter->bytecodeCapacity = emitter->bytecodeLength = code->bytecodeLength;
-    return emitter;
+void nodoka_disposeCode(nodoka_code *code) {
+    for (int i = 0; i < code->codePoolLength; i++) {
+        nodoka_disposeCode(code->codePool[i]);
+    }
+    free(code->stringPool);
+    free(code->codePool);
+    free(code->bytecode);
+    if (code->formalParameters.array)
+        free(code->formalParameters.array);
+    free(code);
 }
+
+

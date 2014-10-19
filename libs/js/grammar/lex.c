@@ -143,10 +143,58 @@ static nodoka_token *newToken(enum nodoka_token_type type) {
     return token;
 }
 
+static uint16_t dealUnicodeEscapeSequence(nodoka_lex *lex) {
+    uint16_t val;
+    uint16_t d1 = lex->next(lex);
+    if (d1 >= '0' && d1 <= '9') {
+        val = d1 - '0';
+    } else if (d1 >= 'A' && d1 <= 'F') {
+        val = d1 - 'A' + 10;
+    } else if (d1 >= 'a' && d1 <= 'f') {
+        val = d1 - 'a' + 10;
+    } else {
+        assert(!"SyntaxError: Expected hex digits in unicode escape sequence");
+    }
+    val *= 16;
+    uint16_t d2 = lex->next(lex);
+    if (d2 >= '0' && d2 <= '9') {
+        val += d2 - '0';
+    } else if (d2 >= 'A' && d2 <= 'F') {
+        val += d2 - 'A' + 10;
+    } else if (d2 >= 'a' && d2 <= 'f') {
+        val += d2 - 'a' + 10;
+    } else {
+        assert(!"SyntaxError: Expected hex digits in unicode escape sequence");
+    }
+    val *= 16;
+    uint16_t d3 = lex->next(lex);
+    if (d3 >= '0' && d3 <= '9') {
+        val += d3 - '0';
+    } else if (d3 >= 'A' && d3 <= 'F') {
+        val += d3 - 'A' + 10;
+    } else if (d3 >= 'a' && d3 <= 'f') {
+        val += d3 - 'a' + 10;
+    } else {
+        assert(!"SyntaxError: Expected hex digits in unicode escape sequence");
+    }
+    val *= 16;
+    uint16_t d4 = lex->next(lex);
+    if (d4 >= '0' && d4 <= '9') {
+        val += d4 - '0';
+    } else if (d4 >= 'A' && d4 <= 'F') {
+        val += d4 - 'A' + 10;
+    } else if (d4 >= 'a' && d4 <= 'f') {
+        val += d4 - 'a' + 10;
+    } else {
+        assert(!"SyntaxError: Expected hex digits in unicode escape sequence");
+    }
+    return val;
+}
+
 static nodoka_token *stateDefault(nodoka_lex *lex);
 static nodoka_token *stateSingleLineComment(nodoka_lex *lex);
 static nodoka_token *stateMultiLineComment(nodoka_lex *lex);
-static nodoka_token *stateIdentiferPart(nodoka_lex *lex);
+static nodoka_token *stateIdentifierPart(nodoka_lex *lex);
 static nodoka_token *stateHexIntegerLiteral(nodoka_lex *lex);
 static nodoka_token *stateOctIntegerLiteral(nodoka_lex *lex);
 static nodoka_token *stateDecLiteral(nodoka_lex *lex);
@@ -155,6 +203,9 @@ static nodoka_token *stateExpSign(nodoka_lex *lex);
 static nodoka_token *stateExpPart(nodoka_lex *lex);
 static nodoka_token *stateDoubleString(nodoka_lex *lex);
 static nodoka_token *stateSingleString(nodoka_lex *lex);
+static nodoka_token *stateRegexpChar(nodoka_lex *lex);
+static nodoka_token *stateRegexpClassChar(nodoka_lex *lex);
+static nodoka_token *stateRegexpFlags(nodoka_lex *lex);
 
 static nodoka_token *stateDefault(nodoka_lex *lex) {
     uint16_t next = lex->next(lex);
@@ -182,33 +233,47 @@ static nodoka_token *stateDefault(nodoka_lex *lex) {
             uint16_t next = lex->lookahead(lex);
             if (next == '/') {
                 lex->state = stateSingleLineComment;
+                return NULL;
             } else if (next == '*') {
                 lex->state = stateMultiLineComment;
+                return NULL;
+            } else if (lex->lookahead(lex) == '=') {
+                lex->next(lex);
+                return newToken(NODOKA_TOKEN_DIV_ASSIGN);
             } else {
-                if (lex->regexp) {
-                    //TODO
-                    assert(!"Regexp is not currently supported");
-                } else {
-                    if (lex->lookahead(lex) == '=') {
-                        lex->next(lex);
-                        return newToken(NODOKA_TOKEN_DIV_ASSIGN);
-                    } else {
-                        return newToken(NODOKA_TOKEN_DIV);
-                    }
-                }
+                return newToken(NODOKA_TOKEN_DIV);
             }
-            return NULL;
         }
         case '$':
         case '_': {
             createBuffer(lex);
             appendToBuffer(lex, next);
-            lex->state = stateIdentiferPart;
+            lex->state = stateIdentifierPart;
             return NULL;
         }
-        case '\\':
-            //TODO Unicode Escape Sequence
-            assert(0);
+        case '\\': {
+            if (lex->next(lex) != 'u') {
+                assert(!"SyntaxError: Expected unicode escape sequence");
+            }
+            uint16_t val = dealUnicodeEscapeSequence(lex);
+            if (val != '_' && val != '$') {
+                switch (unicode_getType(val)) {
+                    case UPPERCASE_LETTER:
+                    case LOWERCASE_LETTER:
+                    case TITLECASE_LETTER:
+                    case MODIFIER_LETTER:
+                    case OTHER_LETTER:
+                    case LETTER_NUMBER: {
+                        break;
+                    }
+                    default: assert(!"SyntaxError: Illegal Identifier Start");
+                }
+            }
+            createBuffer(lex);
+            appendToBuffer(lex, val);
+            lex->state = stateIdentifierPart;
+            return NULL;
+        }
         case '.': {
             uint16_t nch = lex->lookahead(lex);
             if (nch >= '0' && nch <= '9') {
@@ -372,11 +437,11 @@ static nodoka_token *stateDefault(nodoka_lex *lex) {
         case LETTER_NUMBER: {
             createBuffer(lex);
             appendToBuffer(lex, next);
-            lex->state = stateIdentiferPart;
+            lex->state = stateIdentifierPart;
             return NULL;
         }
     }
-    assert(0);
+    assert(!"SyntaxError: Unexpected source character");
     return NULL;
 }
 
@@ -386,7 +451,8 @@ static nodoka_token *stateSingleLineComment(nodoka_lex *lex) {
         case CR:
         case LF:
         case LS:
-        case PS: {
+        case PS:
+        case 0xFFFF: {
             lex->state = stateDefault;
             return NULL;
         }
@@ -410,12 +476,16 @@ static nodoka_token *stateMultiLineComment(nodoka_lex *lex) {
         case LS:
         case PS: {
             lex->lineBefore = true;
+            break;
+        }
+        case 0xFFFF: {
+            assert(!"SyntaxError: MultiLineComment not enclosed");
         }
     }
     return NULL;
 }
 
-static nodoka_token *stateIdentiferPart(nodoka_lex *lex) {
+static nodoka_token *stateIdentifierPart(nodoka_lex *lex) {
     uint16_t next = lex->lookahead(lex);
     switch (next) {
         case '$':
@@ -427,8 +497,31 @@ static nodoka_token *stateIdentiferPart(nodoka_lex *lex) {
             return NULL;
         }
         case '\\': {
-            //TODO Unicode Escape Sequence
-            assert(0);
+            lex->next(lex);
+            if (lex->next(lex) != 'u') {
+                assert(!"SyntaxError: Expected unicode escape sequence");
+            }
+            uint16_t val = dealUnicodeEscapeSequence(lex);
+            if (val != '_' && val != '$' && val != ZWNJ && val != ZWJ) {
+                switch (unicode_getType(val)) {
+                    case UPPERCASE_LETTER:
+                    case LOWERCASE_LETTER:
+                    case TITLECASE_LETTER:
+                    case MODIFIER_LETTER:
+                    case OTHER_LETTER:
+                    case LETTER_NUMBER:
+                    case CONNECTOR_PUNCTUATION:
+                    case DECIMAL_DIGIT_NUMBER:
+                    case NON_SPACING_MARK:
+                    case COMBINING_SPACING_MARK: {
+                        break;
+                    }
+                    default: assert(!"SyntaxError: Illegal Identifier Part");
+                }
+            }
+            appendToBuffer(lex, val);
+            lex->state = stateIdentifierPart;
+            return NULL;
         }
     }
     switch (unicode_getType(next)) {
@@ -670,13 +763,98 @@ static void dealEscapeSequence(nodoka_lex *lex) {
         }
         case LF:
         case LS:
-        case PS:
+        case PS: return;
+        case '\'': appendToBuffer(lex, '\''); return;
+        case '"': appendToBuffer(lex, '"'); return;
+        case '\\': appendToBuffer(lex, '\\'); return;
+        case 'b': appendToBuffer(lex, '\b'); return;
+        case 'f': appendToBuffer(lex, '\f'); return;
+        case 'n': appendToBuffer(lex, '\n'); return;
+        case 'r': appendToBuffer(lex, '\r'); return;
+        case 't': appendToBuffer(lex, '\t'); return;
+        case 'v': appendToBuffer(lex, '\v'); return;
+        case '0': {
+            uint16_t next = lex->lookahead(lex);
+            if (next >= '0' && next <= '9') {
+                assert(!"UnsupprtedError: Oct Escape Sequence");
+            }
             return;
-        case 'n':
-            appendToBuffer(lex, '\n');
+        }
+        case 'x': {
+            uint16_t val;
+            uint16_t d1 = lex->next(lex);
+            if (d1 >= '0' && d1 <= '9') {
+                val = d1 - '0';
+            } else if (d1 >= 'A' && d1 <= 'F') {
+                val = d1 - 'A' + 10;
+            } else if (d1 >= 'a' && d1 <= 'f') {
+                val = d1 - 'a' + 10;
+            } else {
+                assert(!"SyntaxError: Expected hex digits in hex escape sequence");
+            }
+            uint16_t d2 = lex->next(lex);
+            val *= 16;
+            if (d2 >= '0' && d2 <= '9') {
+                val += d2 - '0';
+            } else if (d2 >= 'A' && d2 <= 'F') {
+                val += d2 - 'A' + 10;
+            } else if (d2 >= 'a' && d2 <= 'f') {
+                val += d2 - 'a' + 10;
+            } else {
+                assert(!"SyntaxError: Expected hex digits in hex escape sequence");
+            }
+            appendToBuffer(lex, val);
             return;
-        default:
-            assert(0);
+        }
+        case 'u': {
+            uint16_t val;
+            uint16_t d1 = lex->next(lex);
+            if (d1 >= '0' && d1 <= '9') {
+                val = d1 - '0';
+            } else if (d1 >= 'A' && d1 <= 'F') {
+                val = d1 - 'A' + 10;
+            } else if (d1 >= 'a' && d1 <= 'f') {
+                val = d1 - 'a' + 10;
+            } else {
+                assert(!"SyntaxError: Expected hex digits in unicode escape sequence");
+            }
+            val *= 16;
+            uint16_t d2 = lex->next(lex);
+            if (d2 >= '0' && d2 <= '9') {
+                val += d2 - '0';
+            } else if (d2 >= 'A' && d2 <= 'F') {
+                val += d2 - 'A' + 10;
+            } else if (d2 >= 'a' && d2 <= 'f') {
+                val += d2 - 'a' + 10;
+            } else {
+                assert(!"SyntaxError: Expected hex digits in unicode escape sequence");
+            }
+            val *= 16;
+            uint16_t d3 = lex->next(lex);
+            if (d3 >= '0' && d3 <= '9') {
+                val += d3 - '0';
+            } else if (d3 >= 'A' && d3 <= 'F') {
+                val += d3 - 'A' + 10;
+            } else if (d3 >= 'a' && d3 <= 'f') {
+                val += d3 - 'a' + 10;
+            } else {
+                assert(!"SyntaxError: Expected hex digits in unicode escape sequence");
+            }
+            val *= 16;
+            uint16_t d4 = lex->next(lex);
+            if (d4 >= '0' && d4 <= '9') {
+                val += d4 - '0';
+            } else if (d4 >= 'A' && d4 <= 'F') {
+                val += d4 - 'A' + 10;
+            } else if (d4 >= 'a' && d4 <= 'f') {
+                val += d4 - 'a' + 10;
+            } else {
+                assert(!"SyntaxError: Expected hex digits in unicode escape sequence");
+            }
+            appendToBuffer(lex, val);
+            return;
+        }
+        default: appendToBuffer(lex, next); return;
     }
 }
 
@@ -736,18 +914,161 @@ static nodoka_token *stateSingleString(nodoka_lex *lex) {
     }
 }
 
-nodoka_lex *lex_new(char *chr) {
+static nodoka_token *stateRegexpChar(nodoka_lex *lex) {
+    uint16_t nxt = lex->next(lex);
+    switch (nxt) {
+        case '/':
+            lex->state = stateRegexpFlags;
+            lex->data.regexpContent = cleanBuffer(lex);
+            return NULL;
+        case '\'':
+            nxt = lex->next(lex);
+            switch (nxt) {
+                case CR:
+                case LF:
+                case LS:
+                case PS:
+                case 0xFFFF:
+                    assert(!"SyntaxError: Regexp literal is not enclosed");
+            }
+            appendToBuffer(lex, '\'');
+            appendToBuffer(lex, nxt);
+            return NULL;
+        case '[':
+            appendToBuffer(lex, '[');
+            lex->state = stateRegexpClassChar;
+            return NULL;
+        case CR:
+        case LF:
+        case LS:
+        case PS:
+        case 0xFFFF:
+            assert(!"SyntaxError: Regexp literal is not enclosed");
+        default:
+            appendToBuffer(lex, nxt);
+            return NULL;
+    }
+}
+
+static nodoka_token *stateRegexpClassChar(nodoka_lex *lex) {
+    uint16_t nxt = lex->next(lex);
+    switch (nxt) {
+        case ']':
+            appendToBuffer(lex, ']');
+            lex->state = stateRegexpChar;
+            return NULL;
+        case '\'':
+            nxt = lex->next(lex);
+            switch (nxt) {
+                case CR:
+                case LF:
+                case LS:
+                case PS:
+                case 0xFFFF:
+                    assert(!"SyntaxError: Regexp literal is not enclosed");
+            }
+            appendToBuffer(lex, '\'');
+            appendToBuffer(lex, nxt);
+            return NULL;
+        case CR:
+        case LF:
+        case LS:
+        case PS:
+        case 0xFFFF:
+            assert(!"SyntaxError: Regexp literal is not enclosed");
+        default:
+            appendToBuffer(lex, nxt);
+            return NULL;
+    }
+}
+
+static nodoka_token *stateRegexpFlags(nodoka_lex *lex) {
+    uint16_t next = lex->lookahead(lex);
+    switch (next) {
+        case '$':
+        case '_':
+        case ZWNJ:
+        case ZWJ: {
+            lex->next(lex);
+            appendToBuffer(lex, next);
+            return NULL;
+        }
+        case '\\': {
+            lex->next(lex);
+            if (lex->next(lex) != 'u') {
+                assert(!"SyntaxError: Expected unicode escape sequence");
+            }
+            uint16_t val = dealUnicodeEscapeSequence(lex);
+            if (val != '_' && val != '$' && val != ZWNJ && val != ZWJ) {
+                switch (unicode_getType(val)) {
+                    case UPPERCASE_LETTER:
+                    case LOWERCASE_LETTER:
+                    case TITLECASE_LETTER:
+                    case MODIFIER_LETTER:
+                    case OTHER_LETTER:
+                    case LETTER_NUMBER:
+                    case CONNECTOR_PUNCTUATION:
+                    case DECIMAL_DIGIT_NUMBER:
+                    case NON_SPACING_MARK:
+                    case COMBINING_SPACING_MARK: {
+                        break;
+                    }
+                    default: assert(!"SyntaxError: Illegal Identifier Part");
+                }
+            }
+            appendToBuffer(lex, val);
+            lex->state = stateIdentifierPart;
+            return NULL;
+        }
+    }
+    switch (unicode_getType(next)) {
+        case UPPERCASE_LETTER:
+        case LOWERCASE_LETTER:
+        case TITLECASE_LETTER:
+        case MODIFIER_LETTER:
+        case OTHER_LETTER:
+        case LETTER_NUMBER:
+        case CONNECTOR_PUNCTUATION:
+        case DECIMAL_DIGIT_NUMBER:
+        case NON_SPACING_MARK:
+        case COMBINING_SPACING_MARK: {
+            lex->next(lex);
+            appendToBuffer(lex, next);
+            return NULL;
+        }
+    }
+    lex->state = stateDefault;
+
+    nodoka_token *token = newToken(NODOKA_TOKEN_REGEXP);
+    token->regexp = lex->data.regexpContent;
+    token->flags = cleanBuffer(lex);
+    return token;
+}
+
+nodoka_token *lex_regexp(nodoka_lex *lex, bool assign) {
+    createBuffer(lex);
+    if (assign) {
+        appendToBuffer(lex, '=');
+    }
+    lex->state = stateRegexpChar;
+    return lex_next(lex);
+}
+
+nodoka_lex *lex_new(utf16_string_t utf16) {
     nodoka_lex *l = malloc(sizeof(struct struct_lex));
     l->next = next;
     l->lookahead = lookahead;
     l->state = stateDefault;
-    l->content = unicode_toUtf16(UTF8_STRING(chr));
+    l->content = utf16;
     l->ptr = 0;
-    l->regexp = false;
     l->strictMode = true;
     l->lineBefore = false;
     l->parseId = true;
     return l;
+}
+
+void lex_dispose(nodoka_lex *lex) {
+    free(lex);
 }
 
 nodoka_token *lex_next(nodoka_lex *lex) {

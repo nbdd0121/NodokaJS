@@ -20,20 +20,26 @@ bool nodoka_intraPcr(nodoka_code_emitter *source, nodoka_intraPcrPass pass) {
     for (size_t i = 0; i < size;) {
         enum nodoka_bytecode bc = nodoka_pass_fetch8(source, &i);
         switch (bc) {
-            case NODOKA_BC_LOAD_STR: i += 2; break;
             case NODOKA_BC_LOAD_NUM: i += 8; break;
+            case NODOKA_BC_CALL:
+            case NODOKA_BC_NEW: i++; break;
+            case NODOKA_BC_LOAD_STR:
+            case NODOKA_BC_DECL:
+            case NODOKA_BC_FUNC:
+            case NODOKA_BC_TRY: i += 2; break;
             case NODOKA_BC_JMP:
-            case NODOKA_BC_JT: {
+            case NODOKA_BC_JT:
+            case NODOKA_BC_CATCH: {
                 labelMap[i - 1] = 0;
                 uint16_t offset = nodoka_pass_fetch16(source, &i);
                 labelMap[offset] = 0;
                 break;
             }
-            case NODOKA_BC_RET:
+            /*case NODOKA_BC_RET:
             case NODOKA_BC_THROW: {
                 labelMap[i - 1] = 0;
                 break;
-            }
+            }*/
             default: break;
         }
     }
@@ -50,19 +56,20 @@ bool nodoka_intraPcr(nodoka_code_emitter *source, nodoka_intraPcrPass pass) {
         }
         switch (source->bytecode[start]) {
             case NODOKA_BC_JMP:
-            case NODOKA_BC_JT: {
+            case NODOKA_BC_JT:
+            case NODOKA_BC_CATCH: {
                 labelMap[start] = temp->bytecodeLength;
                 nodoka_emitBytecode(temp, source->bytecode[start], NULL);
                 mod |= pass(source, temp, start + 3, end);
                 break;
             }
-            case NODOKA_BC_RET:
+            /*case NODOKA_BC_RET:
             case NODOKA_BC_THROW: {
                 labelMap[start] = temp->bytecodeLength;
                 nodoka_emitBytecode(temp, source->bytecode[start]);
                 mod |= pass(source, temp, start + 1, end);
                 break;
-            }
+            }*/
             default: {
                 labelMap[start] = temp->bytecodeLength;
                 mod |= pass(source, temp, start, end);
@@ -77,7 +84,8 @@ bool nodoka_intraPcr(nodoka_code_emitter *source, nodoka_intraPcrPass pass) {
         if (labelMap[i] != 0xFFFF) {
             switch (source->bytecode[i]) {
                 case NODOKA_BC_JMP:
-                case NODOKA_BC_JT: {
+                case NODOKA_BC_JT:
+                case NODOKA_BC_CATCH: {
                     nodoka_relocatable rel = labelMap[i] + 1;
                     nodoka_label prevRel = (source->bytecode[i + 1] << 8) | source->bytecode[i + 2];
                     nodoka_relocate(temp, rel, labelMap[prevRel]);

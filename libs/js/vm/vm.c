@@ -9,6 +9,7 @@
 #include "js/js.h"
 #include "js/bytecode.h"
 #include "js/object.h"
+#include "js/builtin.h"
 
 nodoka_context *nodoka_newContext(nodoka_global *global, nodoka_envRec *env, nodoka_code *code, nodoka_object *this) {
     nodoka_context *context = malloc(sizeof(nodoka_context));
@@ -20,7 +21,13 @@ nodoka_context *nodoka_newContext(nodoka_global *global, nodoka_envRec *env, nod
     context->stackLimit = context->stack + 128;
     context->this = this;
     context->insPtr = 0;
+    context->catchPtr = (size_t)(-1);
     return context;
+}
+
+void nodoka_disposeContext(nodoka_context *context) {
+    free(context->stack);
+    free(context);
 }
 
 static nodoka_data *nodoka_pop(nodoka_context *context) {
@@ -55,6 +62,25 @@ static uint64_t fetch64(nodoka_context *context) {
     uint64_t ret = (uint64_t)fetch32(context) << 32;
     ret |= fetch32(context);
     return ret;
+}
+
+
+static void throwError(nodoka_context *context, nodoka_data *data) {
+    nodoka_push(context, data);
+}
+
+static void throwTypeError(nodoka_context *context, char *msg) {
+    throwError(context, (nodoka_data *)nodoka_newTypeError(context->global, msg ? nodoka_newStringFromUtf8(msg) : NULL));
+}
+
+static void throwReferenceError(nodoka_context *context, nodoka_string *msg) {
+    throwError(context, (nodoka_data *)nodoka_newReferenceError(context->global, msg));
+}
+
+__attribute__((deprecated))
+static void throwString(nodoka_context *context, char *str) {
+    //TODO We need to throw error actually, this works only temporarily
+    throwError(context, (nodoka_data *)nodoka_newStringFromUtf8(str));
 }
 
 int8_t nodoka_absRelComp(nodoka_data *sp1, nodoka_data *sp0) {
@@ -156,27 +182,17 @@ static nodoka_data *getValue(nodoka_context *context, nodoka_data *val) {
         nodoka_reference *ref = (nodoka_reference *)val;
         nodoka_data *result;
         /* Notice that ref->base = NULL indicates a environment record */
-        if (ref->base && ref->base == nodoka_undefined) {
-            if (true) {
-                assert(!"FeatureNotImplementedError");
-            } else {
-                assert(!"ReferenceError");
-            }
-        }
-        if (ref->base) {
+        if (!ref->base) {
+            throwReferenceError(context, nodoka_concatString(2, ref->name, nodoka_newStringFromUtf8(" is not defined")));
+            return NULL;
+        } else if (ref->base->type != NODOKA_ENV) {
             if (ref->base->type == NODOKA_OBJECT) {
                 result = nodoka_get((nodoka_object *)ref->base, ref->name);
             } else {
-                assert(0);
-                //Special get, see ECMA-262
+                result = nodoka_get(nodoka_toObject(context, ref->base), ref->name);
             }
         } else {
-            nodoka_envRec *env;
-            for (env = context->env; env->outer; env = env->outer) {
-                if (nodoka_hasBinding(env, ref->name)) {
-                    break;
-                }
-            }
+            nodoka_envRec *env = (nodoka_envRec *)ref->base;
             result = nodoka_getBindingValue(env, ref->name);
         }
         return result;
@@ -186,14 +202,13 @@ static nodoka_data *getValue(nodoka_context *context, nodoka_data *val) {
 }
 
 static void putValue(nodoka_context *context, nodoka_reference *ref, nodoka_data *val) {
-    if (ref->base && ref->base == nodoka_undefined) {
+    if (!ref->base) {
         if (true) {
-            assert(!"FeatureNotImplementedError");
+            nodoka_put(context->global->global, ref->name, val, false/*Strict*/);
         } else {
             assert(!"ReferenceError");
         }
-    }
-    if (ref->base) {
+    } else if (ref->base->type != NODOKA_ENV) {
         if (ref->base->type == NODOKA_OBJECT) {
             //Strict?
             nodoka_put((nodoka_object *)ref->base, ref->name, val, false/*Strict*/);
@@ -201,24 +216,9 @@ static void putValue(nodoka_context *context, nodoka_reference *ref, nodoka_data
             assert(0);
         }
     } else {
-        nodoka_envRec *env;
-        for (env = context->env; env->outer; env = env->outer) {
-            if (nodoka_hasBinding(env, ref->name)) {
-                break;
-            }
-        }
-        nodoka_setMutableBinding(context->env, ref->name, val);
+        nodoka_envRec *env = (nodoka_envRec *)ref->base;
+        nodoka_setMutableBinding(env, ref->name, val);
     }
-}
-
-static void throwError(nodoka_context *context, nodoka_data *data) {
-    context->stackTop = context->stack;
-    nodoka_push(context, data);
-}
-
-static void throwString(nodoka_context *context, char *str) {
-    //TODO We need to throw error actually, this works only temporarily
-    throwError(context, (nodoka_data *)nodoka_newStringFromUtf8(str));
 }
 
 static enum nodoka_completion nodoka_stepExec(nodoka_context *context) {
@@ -251,8 +251,19 @@ static enum nodoka_completion nodoka_stepExec(nodoka_context *context) {
             nodoka_push(context, (nodoka_data *)nodoka_newNumber(val));
             break;
         }
+        case NODOKA_BC_FUNC: {
+            uint16_t imm16 = fetch16(context);
+            nodoka_code *code = context->code->codePool[imm16];
+            nodoka_object *obj = nodoka_newFunction(context, code);
+            nodoka_push(context, (nodoka_data *)obj);
+            break;
+        }
         case NODOKA_BC_LOAD_OBJ: {
             nodoka_push(context, (nodoka_data *)context->global->object);
+            break;
+        }
+        case NODOKA_BC_LOAD_ARR: {
+            nodoka_push(context, (nodoka_data *)context->global->Array);
             break;
         }
         case NODOKA_BC_NOP: {
@@ -300,7 +311,7 @@ static enum nodoka_completion nodoka_stepExec(nodoka_context *context) {
             break;
         }
         case NODOKA_BC_STR: {
-            nodoka_push(context, (nodoka_data *)nodoka_toString(context->global, nodoka_pop(context)));
+            nodoka_push(context, (nodoka_data *)nodoka_toString(context, nodoka_pop(context)));
             break;
         }
         case NODOKA_BC_REF: {
@@ -317,12 +328,22 @@ static enum nodoka_completion nodoka_stepExec(nodoka_context *context) {
         case NODOKA_BC_ID: {
             nodoka_string *sp0 = (nodoka_string *)nodoka_pop(context);
             assertString(sp0);
-            nodoka_push(context, (nodoka_data *)nodoka_newReference(NULL, sp0));
+            nodoka_envRec *env;
+            for (env = context->env; env; env = env->outer) {
+                if (nodoka_hasBinding(env, sp0)) {
+                    break;
+                }
+            }
+            nodoka_push(context, (nodoka_data *)nodoka_newReference((nodoka_data *)env, sp0));
             break;
         }
         case NODOKA_BC_GET: {
             nodoka_data *sp0 = nodoka_pop(context);
-            nodoka_push(context, getValue(context, sp0));
+            nodoka_data *ret = getValue(context, sp0);
+            if (!ret) {
+                return NODOKA_COMPLETION_THROW;
+            }
+            nodoka_push(context, ret);
             break;
         }
         case NODOKA_BC_PUT: {
@@ -343,7 +364,12 @@ static enum nodoka_completion nodoka_stepExec(nodoka_context *context) {
             }
             /* A lot of check currently ignored */
             nodoka_reference *ref = (nodoka_reference *)sp0;
-            bool result = nodoka_delete(nodoka_toObject(ref->base), ref->name, false);
+            bool result;
+            if (ref->base->type != NODOKA_ENV) {
+                result = nodoka_delete(nodoka_toObject(context, ref->base), ref->name, false);
+            } else {
+                assert(0);
+            }
             nodoka_push(context, result ? nodoka_true : nodoka_false);
             break;
         }
@@ -358,6 +384,9 @@ static enum nodoka_completion nodoka_stepExec(nodoka_context *context) {
             }
             nodoka_data *sp0 = nodoka_pop(context);
             nodoka_object *func = (nodoka_object *)getValue(context, sp0);
+            if (!func) {
+                return NODOKA_COMPLETION_THROW;
+            }
             if (func->base.type != NODOKA_OBJECT || !func->call) {
                 throwString(context, "TypeError: Cannot call on non-function");
                 return NODOKA_COMPLETION_THROW;
@@ -365,17 +394,16 @@ static enum nodoka_completion nodoka_stepExec(nodoka_context *context) {
             nodoka_data *this;
             if (sp0->type == NODOKA_REFERENCE) {
                 nodoka_reference *ref = (nodoka_reference *)sp0;
-                if (true) {
+                if (ref->base->type != NODOKA_ENV) {
                     this = ref->base;
                 } else {
-                    //Env record
-                    assert(0);
+                    this = context->env->this;
                 }
             } else {
                 this = nodoka_undefined;
             }
             nodoka_data *ret;
-            enum nodoka_completion comp = nodoka_call(context->global, func, this, &ret, count, args);
+            enum nodoka_completion comp = nodoka_call(context, func, this, &ret, count, args);
             free(args);
             switch (comp) {
                 case NODOKA_COMPLETION_THROW: {
@@ -409,7 +437,7 @@ static enum nodoka_completion nodoka_stepExec(nodoka_context *context) {
                 return NODOKA_COMPLETION_THROW;
             }
             nodoka_data *ret;
-            enum nodoka_completion comp = nodoka_construct(context->global, constructor, &ret, count, args);
+            enum nodoka_completion comp = nodoka_construct(context, constructor, &ret, count, args);
             free(args);
             switch (comp) {
                 case NODOKA_COMPLETION_THROW: {
@@ -426,6 +454,14 @@ static enum nodoka_completion nodoka_stepExec(nodoka_context *context) {
         }
         case NODOKA_BC_TYPEOF: {
             nodoka_data *sp0 = nodoka_pop(context);
+            if (sp0->type == NODOKA_REFERENCE) {
+                nodoka_reference *ref = (nodoka_reference *)sp0;
+                if (!ref->base) {
+                    sp0 = nodoka_undefined;
+                } else {
+                    sp0 = getValue(context, sp0);
+                }
+            }
             switch (sp0->type) {
                 case NODOKA_UNDEF:
                     nodoka_push(context, (nodoka_data *)nodoka_newStringFromUtf8("undefined"));
@@ -505,9 +541,9 @@ static enum nodoka_completion nodoka_stepExec(nodoka_context *context) {
             assertPrimitive(sp1);
             assertPrimitive(sp0);
             if (sp1->type == NODOKA_STRING || sp0->type == NODOKA_STRING) {
-                nodoka_string *lstr = nodoka_toString(context->global, sp1);
-                nodoka_string *rstr = nodoka_toString(context->global, sp0);
-                nodoka_push(context, (nodoka_data *)nodoka_concatString(lstr, rstr));
+                nodoka_string *lstr = nodoka_toString(context, sp1);
+                nodoka_string *rstr = nodoka_toString(context, sp0);
+                nodoka_push(context, (nodoka_data *)nodoka_concatString(2, lstr, rstr));
             } else {
                 nodoka_number *lnum = nodoka_toNumber(sp1);
                 nodoka_number *rnum = nodoka_toNumber(sp0);
@@ -628,13 +664,49 @@ static enum nodoka_completion nodoka_stepExec(nodoka_context *context) {
             }
             break;
         }
+        case NODOKA_BC_TRY: {
+            nodoka_code *code = context->code->codePool[fetch16(context)];
+            nodoka_envRec *env = nodoka_newDeclEnvRecord(context->env);
+            nodoka_context *cnt = nodoka_newContext(context->global, env, code, context->this);
+            nodoka_data *ret;
+            nodoka_push(cnt, nodoka_pop(context));
+            enum nodoka_completion comp = nodoka_exec(cnt, &ret);
+            nodoka_disposeContext(cnt);
+            switch (comp) {
+                case NODOKA_COMPLETION_THROW:
+                    throwError(context, ret);
+                    return NODOKA_COMPLETION_THROW;
+                case NODOKA_COMPLETION_RETURN:
+                    nodoka_push(context, ret);
+                    break;
+                default: assert(0);
+            }
+            break;
+        }
+        case NODOKA_BC_CATCH: {
+            context->catchPtr = fetch16(context);
+            break;
+        }
         case NODOKA_BC_THIS: {
             nodoka_push(context, (nodoka_data *)context->this);
             break;
 
         }
         case NODOKA_BC_THROW: {
+            throwError(context, nodoka_pop(context));
             return NODOKA_COMPLETION_THROW;
+        }
+        case NODOKA_BC_NOCATCH: {
+            context->catchPtr = (size_t)(-1);
+            break;
+        }
+        case NODOKA_BC_DECL: {
+            uint16_t imm16 = fetch16(context);
+            nodoka_string *var = context->code->stringPool[imm16];
+            if (!nodoka_hasBinding(context->env, var)) {
+                nodoka_setMutableBinding(context->env, var, nodoka_undefined);
+            }
+            break;
         }
         default: assert(0);
     }
@@ -643,7 +715,31 @@ static enum nodoka_completion nodoka_stepExec(nodoka_context *context) {
 
 enum nodoka_completion nodoka_exec(nodoka_context *context, nodoka_data **retPtr) {
     enum nodoka_completion comp;
-    while ((comp = nodoka_stepExec(context)) == NODOKA_COMPLETION_NORMAL);
+    while (true) {
+        while (true) {
+            comp = nodoka_stepExec(context);
+            if (comp != NODOKA_COMPLETION_NORMAL) {
+                break;
+            }
+        }
+        if (comp == NODOKA_COMPLETION_THROW) {
+            if (context->catchPtr != (size_t)(-1)) {
+                nodoka_data *ret = nodoka_pop(context);
+                nodoka_data *com = nodoka_pop(context);
+                context->stack = context->stackTop;
+                nodoka_push(context, com);
+                nodoka_push(context, ret);
+
+                context->insPtr = context->catchPtr;
+                continue;
+            } else {
+                nodoka_data *ret = nodoka_pop(context);
+                context->stack = context->stackTop;
+                nodoka_push(context, ret);
+            }
+        }
+        break;
+    }
     nodoka_data *ret = nodoka_pop(context);
     assert(context->stack == context->stackTop);
     if (retPtr)

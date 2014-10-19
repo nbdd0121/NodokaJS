@@ -3,7 +3,6 @@
 #include "js/object.h"
 #include "unicode/hash.h"
 
-
 int nodoka_compareString(void *a, void *b) {
     nodoka_string *x = a;
     nodoka_string *y = b;
@@ -30,9 +29,19 @@ nodoka_object *nodoka_newNativeObject(void) {
     obj->_class = NULL;
     obj->extensible = true;
     obj->getOwnProperty = getOwnProperty;
-    obj->call = NULL;
+
+    obj->primitiveValue = NULL;
     obj->construct = NULL;
+    obj->call = NULL;
+    // bool HasInstance(any)
+    obj->scope = NULL;
+    obj->formalParameters.length = 0;
+    obj->formalParameters.array = NULL;
     obj->code = NULL;
+    obj->targetFunction = NULL;
+    obj->boundThis = NULL;
+    obj->boundArguments.length = 0;
+    obj->boundArguments.array = NULL;
     obj->codeString = NULL;
     return obj;
 }
@@ -141,12 +150,12 @@ bool nodoka_delete(nodoka_object *O, nodoka_string *P, bool throw) {
     return false;
 }
 
-nodoka_data *nodoka_defaultValue(nodoka_global *G, nodoka_object *O, enum nodoka_data_type hint) {
+nodoka_data *nodoka_defaultValue(nodoka_context *C, nodoka_object *O, enum nodoka_data_type hint) {
     if (hint == NODOKA_STRING) {
         nodoka_object *toString = (nodoka_object *)nodoka_get(O, nodoka_newStringFromUtf8("toString"));
         if (toString->base.type == NODOKA_OBJECT && toString->call) {
             nodoka_data *ret;
-            nodoka_call(G, toString, (nodoka_data *)O, &ret, 0, NULL);
+            nodoka_call(C, toString, (nodoka_data *)O, &ret, 0, NULL);
             if (ret->type != NODOKA_OBJECT) {
                 return ret;
             }

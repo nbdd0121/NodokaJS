@@ -10,7 +10,7 @@ nodoka_object *nodoka_newObject(nodoka_global *global) {
     return obj;
 }
 
-static enum nodoka_completion newObject_native(nodoka_global *global, nodoka_object *O, nodoka_data **ret, int argc, nodoka_data **argv) {
+static enum nodoka_completion newObject_native(nodoka_context *C, nodoka_object *O, nodoka_data **ret, int argc, nodoka_data **argv) {
     nodoka_data *value;
     if (argc != 0) {
         value = argv[0];
@@ -25,30 +25,31 @@ static enum nodoka_completion newObject_native(nodoka_global *global, nodoka_obj
         case NODOKA_STRING:
         case NODOKA_BOOL:
         case NODOKA_NUMBER:
-            *ret = (nodoka_data *)nodoka_toObject(value);
+            *ret = (nodoka_data *)nodoka_toObject(C, value);
             return NODOKA_COMPLETION_RETURN;
+        default: break;
     }
     assertType(value, NODOKA_NULL | NODOKA_UNDEF);
-    nodoka_object *obj = nodoka_newObject(global);
+    nodoka_object *obj = nodoka_newObject(C->global);
     // Internal Methods should be done in nodoka_newObject
     *ret = (nodoka_data *)obj;
     return NODOKA_COMPLETION_RETURN;
 }
 
-static enum nodoka_completion Object_native(nodoka_global *global, nodoka_object *func, nodoka_data *this, nodoka_data **ret, int argc, nodoka_data **argv) {
+static enum nodoka_completion Object_native(nodoka_context *C, nodoka_object *func, nodoka_data *this, nodoka_data **ret, int argc, nodoka_data **argv) {
     nodoka_data *value = nodoka_undefined;
     if (argc != 0) {
         value = argv[0];
     }
     if (value == nodoka_undefined || value == nodoka_null) {
-        return newObject_native(global, func, ret, argc, argv);
+        return newObject_native(C, func, ret, argc, argv);
     } else {
-        *ret = (nodoka_data *)nodoka_toObject(value);
+        *ret = (nodoka_data *)nodoka_toObject(C, value);
         return NODOKA_COMPLETION_RETURN;
     }
 }
 
-static enum nodoka_completion getPrototypeOf_native(nodoka_global *global, nodoka_object *func, nodoka_data *this, nodoka_data **ret, int argc, nodoka_data **argv) {
+static enum nodoka_completion getPrototypeOf_native(nodoka_context *C, nodoka_object *func, nodoka_data *this, nodoka_data **ret, int argc, nodoka_data **argv) {
     if (argc == 0 || argv[0]->type != NODOKA_OBJECT) {
         *ret = (nodoka_data *)nodoka_newStringFromUtf8("TypeError: Object.getPrototypeOf called on non-object");
         return NODOKA_COMPLETION_THROW;
@@ -62,7 +63,7 @@ static enum nodoka_completion getPrototypeOf_native(nodoka_global *global, nodok
     return NODOKA_COMPLETION_RETURN;
 }
 
-static enum nodoka_completion preventExtensions_native(nodoka_global *global, nodoka_object *func, nodoka_data *this, nodoka_data **ret, int argc, nodoka_data **argv) {
+static enum nodoka_completion preventExtensions_native(nodoka_context *C, nodoka_object *func, nodoka_data *this, nodoka_data **ret, int argc, nodoka_data **argv) {
     if (argc == 0 || argv[0]->type != NODOKA_OBJECT) {
         *ret = (nodoka_data *)nodoka_newStringFromUtf8("TypeError: Object.preventExtensions called on non-object");
         return NODOKA_COMPLETION_THROW;
@@ -73,7 +74,7 @@ static enum nodoka_completion preventExtensions_native(nodoka_global *global, no
     return NODOKA_COMPLETION_RETURN;
 }
 
-static enum nodoka_completion isExtensible_native(nodoka_global *global, nodoka_object *func, nodoka_data *this, nodoka_data **ret, int argc, nodoka_data **argv) {
+static enum nodoka_completion isExtensible_native(nodoka_context *C, nodoka_object *func, nodoka_data *this, nodoka_data **ret, int argc, nodoka_data **argv) {
     if (argc == 0 || argv[0]->type != NODOKA_OBJECT) {
         *ret = (nodoka_data *)nodoka_newStringFromUtf8("TypeError: Object.isExtensible called on non-object");
         return NODOKA_COMPLETION_THROW;
@@ -83,23 +84,22 @@ static enum nodoka_completion isExtensible_native(nodoka_global *global, nodoka_
     return NODOKA_COMPLETION_RETURN;
 }
 
-static enum nodoka_completion prototype_toString(nodoka_global *global, nodoka_object *func, nodoka_data *this, nodoka_data **ret, int argc, nodoka_data **argv) {
+static enum nodoka_completion prototype_toString(nodoka_context *C, nodoka_object *func, nodoka_data *this, nodoka_data **ret, int argc, nodoka_data **argv) {
     if (this->type == NODOKA_UNDEF) {
         *ret = (nodoka_data *)nodoka_newStringFromUtf8("[object Undefined]");
     } else if (this->type == NODOKA_NULL) {
         *ret = (nodoka_data *)nodoka_newStringFromUtf8("[object Null]");
     } else {
-        nodoka_object *obj = nodoka_toObject(this);
+        nodoka_object *obj = nodoka_toObject(C, this);
         nodoka_string *str = nodoka_newStringFromUtf8("[object ");
-        str = nodoka_concatString(str, obj->_class);
-        str = nodoka_concatString(str, nodoka_newStringFromUtf8("]"));
+        str = nodoka_concatString(3, nodoka_newStringFromUtf8("[object "), obj->_class, nodoka_newStringFromUtf8("]"));
         *ret = (nodoka_data *)str;
     }
     return NODOKA_COMPLETION_RETURN;
 }
 
-static enum nodoka_completion prototype_valueOf(nodoka_global *global, nodoka_object *func, nodoka_data *this, nodoka_data **ret, int argc, nodoka_data **argv) {
-    *ret = (nodoka_data *)nodoka_toObject(this);
+static enum nodoka_completion prototype_valueOf(nodoka_context *C, nodoka_object *func, nodoka_data *this, nodoka_data **ret, int argc, nodoka_data **argv) {
+    *ret = (nodoka_data *)nodoka_toObject(C, this);
     return NODOKA_COMPLETION_RETURN;
 }
 
