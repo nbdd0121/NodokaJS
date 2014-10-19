@@ -1,2 +1,0 @@
-#!/bin/sh
-~/Project/js $1 --no-optimizer
