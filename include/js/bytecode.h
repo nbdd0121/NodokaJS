@@ -219,8 +219,10 @@ void nodoka_xchgEmitter(nodoka_code_emitter *, nodoka_code_emitter *);
 void nodoka_freeEmitter(nodoka_code_emitter *emitter);
 nodoka_code *nodoka_packCode(nodoka_code_emitter *emitter);
 nodoka_code_emitter *nodoka_unpackCode(nodoka_code *code);
+void nodoka_disposeCode(nodoka_code *code);
 
 nodoka_context *nodoka_newContext(nodoka_global *global, nodoka_envRec *env, nodoka_code *code, nodoka_object *this);
+void nodoka_disposeContext(nodoka_context *ctx);
 
 nodoka_envRec *nodoka_newDeclEnvRecord(nodoka_envRec *outer);
 nodoka_envRec *nodoka_newObjEnvRecord(nodoka_object *obj, nodoka_envRec *outer);

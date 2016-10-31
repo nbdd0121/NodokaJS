@@ -304,9 +304,11 @@ struct struct_lex {
 typedef struct struct_grammar nodoka_grammar;
 
 nodoka_lex *lex_new(utf16_string_t utf16);
+void lex_dispose(nodoka_lex *lex);
 nodoka_token *lex_next(nodoka_lex *lex);
 nodoka_token *lex_regexp(nodoka_lex *lex, bool assign);
 nodoka_grammar *grammar_new(nodoka_lex *lex);
+void grammar_dispose(nodoka_grammar *gmr);
 void nodoka_codegen(nodoka_code_emitter *emitter, nodoka_lex_class *node);
 void nodoka_declgen(nodoka_code_emitter *emitter, nodoka_lex_class *node);
 void nodoka_disposeLexNode(nodoka_lex_class *node);

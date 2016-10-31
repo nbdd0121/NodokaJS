@@ -115,8 +115,12 @@ uint16_t nodoka_toUint16(nodoka_number *value);
 nodoka_string *nodoka_toString(nodoka_context *C, nodoka_data *value);
 nodoka_object *nodoka_toObject(nodoka_context *C, nodoka_data *value);
 
+nodoka_number *nodoka_str2num(nodoka_string *str);
+nodoka_string *nodoka_num2str(double val);
+
 /* vm/string.c */
 nodoka_string *nodoka_concatString(size_t i, ...);
+nodoka_string *nodoka_newStringDup(utf16_string_t str);
 
 /* bcloader.c */
 char *nodoka_readFile(char *path, size_t *sizePtr);

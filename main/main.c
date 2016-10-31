@@ -92,7 +92,7 @@ int main(int argc, char **argv) {
 
     {
         size_t size;
-        char *buffer = nodoka_readFile("/home/gary/Projects/NodokaJS/startup.js", &size);
+        char *buffer = nodoka_readFile("startup.js", &size);
         if (!buffer) {
             printf("NodokaJS: Unable to load startup files\n");
             return 1;
